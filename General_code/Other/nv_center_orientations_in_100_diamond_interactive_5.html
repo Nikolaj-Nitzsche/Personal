@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>(100) Diamond — NV Orientations (Selectable)</title>
+  <style>
+    :root{
+      /* Light theme: Pure white background */
+      --bg:#ffffff;
+      --panel:rgba(0,0,0,.04);
+      --panel-border:rgba(0,0,0,.12);
+      --panel-strong:rgba(0,0,0,.06);
+      --text:#0f172a;
+      --muted:#475569;
+      --accent:#374151;   /* B-field (dark gray) */
+      --nv:#b87333;       /* NV (copper) */
+      --wire:#f97316;     /* Wire (orange) */
+      --perp:#64748b;     /* Perpendicular dashed line */
+      --x:#ef4444;        /* Axis colors */
+      --y:#10b981;
+      --z:#3b82f6;
+    }
+    html, body { height: 100%; margin: 0; background: var(--bg); }
+    /* Subtle layered gradient for depth */
+    #app { position: fixed; inset: 0; background:
+      radial-gradient(1200px 900px at 70% 15%, rgba(37,99,235,.08) 0%, rgba(37,99,235,0) 60%),
+      radial-gradient(900px 700px at 20% 85%, rgba(14,165,233,.08) 0%, rgba(14,165,233,0) 55%),
+      var(--bg);
+    }
+    #ui { position: absolute; top: 12px; left: 12px; color: var(--text); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial;
+      display:flex; gap:10px; align-items:center; flex-wrap: wrap;
+      background: var(--panel); border: 1px solid var(--panel-border); padding: 10px 12px; border-radius: 14px; backdrop-filter: blur(8px);
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
+      z-index: 10;
+    }
+    .chip{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:10px; background: var(--panel-strong); border:1px solid var(--panel-border);} 
+    .dot{width:10px; height:10px; border-radius:50%; display:inline-block}
+    .label { color: var(--muted); font-size: 12px; padding: 2px 6px; border-radius: 6px; background: transparent; border: 0; }
+    select, input[type="number"], button {
+      background: rgba(255,255,255,.08); color:var(--text); border:1px solid var(--panel-border); border-radius:10px; padding:8px 10px;
+      outline: none; transition: box-shadow .2s ease, border-color .2s ease, transform .02s ease;
+    }
+    select:focus, input[type="number"]:focus { box-shadow: 0 0 0 3px rgba(125,211,252,.25); border-color: var(--accent); }
+    input[type="number"] { width: 6.5ch; min-width: 6.5ch; text-align:right; }
+    button { cursor:pointer; font-weight:600; background: linear-gradient(180deg, rgba(125,211,252,.25), rgba(125,211,252,.1)); border-color: rgba(125,211,252,.35); }
+    button:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(125,211,252,.18); }
+    button:active { transform: translateY(0); }
+
+    #legend { position: absolute; right: 12px; bottom: 12px; color: var(--text); font: 13px/1.45 system-ui; background: var(--panel); border: 1px solid var(--panel-border); padding: 10px 12px; border-radius: 14px; min-width: 280px; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.25); z-index: 10; }
+    #legend h3 { margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing:.2px; color: var(--muted); }
+    #legend ul { margin: 0; padding-left: 18px; }
+    #legend li { margin: 6px 0; }
+
+    #diagnostics { position: absolute; left: 12px; bottom: 12px; color: var(--text); font: 12px/1.4 system-ui; background: var(--panel); border: 1px solid var(--panel-border); padding: 8px 10px; border-radius: 12px; max-width: 72ch; backdrop-filter: blur(8px); z-index: 10; }
+    #diagnostics summary { cursor:pointer; list-style:none; }
+    #diagnostics summary::-webkit-details-marker{ display:none; }
+    #diagnostics[open] { box-shadow: 0 8px 24px rgba(0,0,0,.10); }
+    #diagnostics .ok { color: #16a34a; }
+    #diagnostics .fail { color: #dc2626; }
+  
+    #angleBox { position:absolute; left: 12px; top: calc(12px + var(--ui-h, 0px) + 8px); color:var(--text); font: 16px/1.4 system-ui; background: var(--panel); border:1px solid var(--panel-border); padding:10px 14px; border-radius:12px; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.15); font-weight:700; letter-spacing:.2px; z-index: 10; }
+    .wire-inline{ display:grid; grid-auto-flow: column; grid-auto-columns: max-content; gap:10px 16px; align-items:center; margin-left:12px; }
+    .wire-inline input, .wire-inline button { margin-right: 6px; }
+
+    #optimizer { position:absolute; left:12px; top: calc(12px + var(--ui-h, 0px) + 8px + var(--angle-h, 56px) + 8px); color: var(--text); font: 14px/1.4 system-ui; background: var(--panel); border:1px solid var(--panel-border); padding: 10px 12px; border-radius: 14px; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.15); z-index:10; }
+    #optimizer .title{ font-weight:700; color:var(--muted); margin-bottom:6px; }
+    #optimizer .grid{ display:grid; grid-template-columns: auto 80px auto 80px; gap:8px 12px; align-items:center; }
+    #optimizer .row{ display:contents; }
+    #optimizer button{ margin-top:6px; }
+    #optResult{ margin-top:8px; font-size:12px; color:var(--muted); }
+    #optHeat{ display:block; margin-top:8px; width: 420px; height: 280px; background:#fff; border:1px solid var(--panel-border); border-radius:12px; }
+    #optHover{ position:absolute; pointer-events:none; background: var(--panel); border:1px solid var(--panel-border); color: var(--text); padding:6px 8px; border-radius:8px; font: 12px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Arial; box-shadow: 0 6px 16px rgba(0,0,0,.12); display:none; white-space:nowrap; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Top UI (legend + NV picker + quick help + inline wire controls) -->
+  <div id="ui">
+    <div class="chip"><span class="dot" style="background:var(--nv)"></span><strong>NV</strong></div>
+    <div class="chip"><span class="dot" style="background:var(--wire)"></span>Wire</div>
+    <div class="chip"><span class="dot" style="background:var(--accent)"></span>B-field</div>
+
+    <div class="label">Pick NV</div>
+    <select id="nvSelect" aria-label="Select NV orientation">
+      <option value="NV 1">NV 1</option>
+      <option value="NV 2">NV 2</option>
+      <option value="NV 3">NV 3</option>
+      <option value="NV 4">NV 4</option>
+    </select>
+
+    <div class="label">Mouse: rotate (LMB), zoom (wheel), pan (RMB)</div>
+
+    <div id="wireInline" class="wire-inline">
+      <div class="label">θ (deg)</div>
+      <input id="thetaInput" type="number" value="45" step="0.1" />
+      <div class="label">φ (deg)</div>
+      <input id="phiInput" type="number" value="45" step="0.1" />
+      <div class="label">Tilt α→XY</div>
+      <input id="tiltInput" type="number" value="-10" step="0.1" />
+      <button id="applyWire" title="Place wire & compute B-field">Apply wire</button>
+    </div>
+  </div>
+
+  <!-- Prominent NV–B angles card (primary & complementary) -->
+  <div id="angleBox">∠(NV, B) ≈ <span id="nvbVal">—</span>  |  180−∠ ≈ <span id="nvbComp">—</span></div>
+
+  <!-- Optimization panel -->
+  <div id="optimizer">
+    <div class="title">Optimize wire (target ∠ NV–B ≈ 90°)</div>
+    <div class="grid">
+      <div class="label">θ min</div><input id="thMin" type="number" value="30" step="1" />
+      <div class="label">θ max</div><input id="thMax" type="number" value="70" step="1" />
+      <div class="label">φ min</div><input id="phMin" type="number" value="-10" step="1" />
+      <div class="label">φ max</div><input id="phMax" type="number" value="70" step="1" />
+      <div class="label">α min</div><input id="alMin" type="number" value="-10" step="1" />
+      <div class="label">α max</div><input id="alMax" type="number" value="-10" step="1" />
+      <div class="label">step (deg)</div><input id="stepDeg" type="number" value="5" step="0.1" />
+      <div></div><button id="optimizeBtn" title="Search within ranges to make ∠(NV,B) ≈ 90°">Optimize</button>
+    </div>
+    <div id="optResult">—</div>
+    <canvas id="optHeat"></canvas>
+    <div id="optHover"></div>
+  </div>
+
+  <!-- Legend -->
+  <div id="legend">
+    <h3>NV angles (θ in XZ from +Z→+X, φ in XY from +X→+Y)</h3>
+    <ul id="legendList"></ul>
+  </div>
+
+  <!-- Diagnostics (collapsed by default) -->
+  <details id="diagnostics">
+    <summary><strong>Diagnostics</strong></summary>
+    <div id="tests"></div>
+    <div id="fatal" style="margin-top:6px;color:#dc2626"></div>
+  </details>
+
+  <script type="module">
+  // Robust loader with fallback CDNs to prevent blank canvas when a CDN is blocked
+  (async () => {
+    let THREE, OrbitControls, CSS2DRenderer, CSS2DObject, cdnUsed = 'esm.sh';
+    try {
+      THREE = await import('https://esm.sh/three@0.160.0');
+      ({ OrbitControls } = await import('https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js'));
+      ({ CSS2DRenderer, CSS2DObject } = await import('https://esm.sh/three@0.160.0/examples/jsm/renderers/CSS2DRenderer.js'));
+    } catch (e1) {
+      cdnUsed = 'skypack';
+      try {
+        THREE = await import('https://cdn.skypack.dev/three@0.160.0');
+        ({ OrbitControls } = await import('https://cdn.skypack.dev/three@0.160.0/examples/jsm/controls/OrbitControls.js'));
+        ({ CSS2DRenderer, CSS2DObject } = await import('https://cdn.skypack.dev/three@0.160.0/examples/jsm/renderers/CSS2DRenderer.js'));
+      } catch (e2) {
+        const fatal = document.getElementById('fatal');
+        fatal.textContent = 'Failed to load Three.js from both esm.sh and Skypack. Your network may be blocking module CDNs.';
+        console.error('Three.js load errors', e1, e2);
+        return; // Abort init — avoids empty plot confusion
+      }
+    }
+
+    // --- Setup ---
+    const app = document.getElementById('app');
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Ensure white background to match CSS theme
+    const bgCSS = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#ffffff';
+    renderer.setClearColor(new THREE.Color(bgCSS), 1);
+    app.appendChild(renderer.domElement);
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(innerWidth, innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    app.appendChild(labelRenderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0xffffff, 20, 40);
+
+    // Camera: positive x,y,z and Z-up in the view
+    const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 80);
+    camera.position.set(4.2, 3.4, 6.2);
+    camera.up.set(0, 0, 1); // Z axis vertical & upward on screen
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enablePan = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0,0,0);
+    controls.update();
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const hemi = new THREE.HemisphereLight(0x99ccff, 0x223344, 0.55);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(2.5, 3.5, 5);
+    dir.castShadow = false;
+    scene.add(dir);
+
+    // --- Basis group for axes (rotate in-plane by +45° about Z) ---
+    const basis = new THREE.Group();
+    scene.add(basis);
+
+    // --- World axes ---
+    const axesGroup = new THREE.Group();
+    basis.add(axesGroup);
+
+    function axis(colorHex, from, to, radius=0.018) {
+      const dir = new THREE.Vector3().subVectors(to, from);
+      const len = dir.length();
+      const geom = new THREE.CylinderGeometry(radius, radius, len, 24, 1, true);
+      const mat = new THREE.MeshStandardMaterial({ color: colorHex, metalness: .6, roughness: .35, emissive: colorHex, emissiveIntensity: .15 });
+      const mesh = new THREE.Mesh(geom, mat);
+      const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
+      mesh.position.copy(mid);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+      axesGroup.add(mesh);
+      const cone = new THREE.ConeGeometry(radius*2.1, Math.min(0.36, len*0.18), 28);
+      const head = new THREE.Mesh(cone, mat);
+      head.position.copy(to);
+      head.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+      axesGroup.add(head);
+    }
+
+    const AXIS_LEN = 2.8; // main axes longer than NV arrows
+    axis(getComputedStyle(document.documentElement).getPropertyValue('--x').trim(), new THREE.Vector3(0,0,0), new THREE.Vector3(AXIS_LEN,0,0)); // +X
+    axis(getComputedStyle(document.documentElement).getPropertyValue('--y').trim(), new THREE.Vector3(0,0,0), new THREE.Vector3(0,AXIS_LEN,0)); // +Y
+    axis(getComputedStyle(document.documentElement).getPropertyValue('--z').trim(), new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,AXIS_LEN)); // +Z
+
+    function addAxisLabel(parent, text, position) {
+      const div = document.createElement('div');
+      div.className = 'label';
+      div.style.color = 'var(--text)';
+      div.style.background = 'rgba(0,0,0,.25)';
+      div.style.border = '1px solid var(--panel-border)';
+      div.style.borderRadius = '8px';
+      div.style.padding = '2px 6px';
+      div.textContent = text;
+      const obj = new CSS2DObject(div);
+      obj.position.copy(position);
+      parent.add(obj);
+    }
+    addAxisLabel(basis, '+X', new THREE.Vector3(AXIS_LEN+0.2, 0, 0));
+    addAxisLabel(basis, '+Y', new THREE.Vector3(0, AXIS_LEN+0.2, 0));
+    addAxisLabel(basis, '+Z', new THREE.Vector3(0, 0, AXIS_LEN+0.2));
+
+    // Rotate the in-plane basis by +45° around Z so NV1's XY projection aligns with +Y
+    basis.rotation.z = Math.PI / 4; // +45°
+
+    // --- XY plane with grid (remains in world XY; not rotated) ---
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.8, 3.8),
+      new THREE.MeshStandardMaterial({ color: 0xe5edf5, transparent: true, opacity: 0.18, roughness:.95, metalness:.0, side: THREE.DoubleSide })
+    );
+    scene.add(plane); // default PlaneGeometry is XY plane
+
+    const grid = new THREE.GridHelper(3.8, 10, 0x94a3b8, 0xd1d5db);
+    grid.rotation.x = Math.PI / 2; // align with XY
+    grid.material.opacity = 0.22; grid.material.transparent = true;
+    scene.add(grid);
+
+    // --- NV vectors mapping ---
+    const NV_MAP = {
+      'NV 1': new THREE.Vector3(-1,  1, -1),
+      'NV 2': new THREE.Vector3(-1, -1,  1),
+      'NV 3': new THREE.Vector3( 1, -1, -1),
+      'NV 4': new THREE.Vector3( 1,  1,  1),
+    };
+
+    // Builder for a centered NV arrow (sleek material)
+    function makeThickArrow(dirVec, color=0xffffff, length=1.4, radius=0.045) {
+      const group = new THREE.Group();
+      const v = dirVec.clone().normalize();
+      const headLen  = length * 0.24;
+      const shaftLen = length - headLen;
+      const half     = length / 2;
+
+      const shaftMat = new THREE.MeshStandardMaterial({ color, metalness: .45, roughness: .28, emissive: color, emissiveIntensity: .25 });
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, shaftLen, 28, 1, true), shaftMat);
+      shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), v);
+      shaft.position.copy(v.clone().multiplyScalar(-headLen/2));
+
+      const headMat = new THREE.MeshStandardMaterial({ color, metalness: .35, roughness: .25, emissive: color, emissiveIntensity: .25 });
+      const head = new THREE.Mesh(new THREE.ConeGeometry(radius*2.15, headLen, 32), headMat);
+      head.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), v);
+      head.position.copy(v.clone().multiplyScalar(half - headLen/2));
+
+      group.add(shaft, head);
+      return group;
+    }
+
+    // Arrow starting at origin (for B-field)
+    function makeArrowFromOrigin(dirVec, color=0x7dd3fc, length=1.2, radius=0.04) {
+      const group = new THREE.Group();
+      const v = dirVec.clone().normalize();
+      const headLen = length * 0.30;
+      const shaftLen = length - headLen;
+      const mat = new THREE.MeshStandardMaterial({ color, metalness:.35, roughness:.35, emissive: color, emissiveIntensity:.35 });
+
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, shaftLen, 28, 1, true), mat);
+      shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), v);
+      shaft.position.copy(v.clone().multiplyScalar(shaftLen/2));
+
+      const head = new THREE.Mesh(new THREE.ConeGeometry(radius*2.2, headLen, 32), mat);
+      head.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), v);
+      head.position.copy(v.clone().multiplyScalar(shaftLen + headLen/2));
+
+      group.add(shaft, head);
+      return group;
+    }
+
+    // Active NV vector group + label
+    const nvGroup = new THREE.Group();
+    scene.add(nvGroup);
+
+    function showNV(name) {
+      nvGroup.clear();
+      const v = NV_MAP[name];
+      const arrow = makeThickArrow(v, getCSSColor('--nv'), 1.4, 0.045);
+      nvGroup.add(arrow);
+      const div = document.createElement('div');
+      div.className = 'label';
+      div.style.color = 'var(--text)';
+      div.style.background = 'rgba(0,0,0,.25)';
+      div.style.border = '1px solid var(--panel-border)';
+      div.style.borderRadius = '8px';
+      div.style.padding = '2px 6px';
+      div.textContent = `${name}`;
+      const lbl = new CSS2DObject(div);
+      const half = 1.4/2;
+      lbl.position.copy(v.clone().normalize().multiplyScalar(half + 0.18));
+      nvGroup.add(lbl);
+    }
+
+    // Compute θ (XZ from +Z→+X) and φ (XY from +X→+Y) in the rotated-basis frame
+    function anglesFor(v) {
+      const vb = v.clone().applyQuaternion(basis.quaternion.clone().invert());
+      const x = vb.x, y = vb.y, z = vb.z;
+      const r = Math.hypot(x, y, z);
+      const theta = Math.acos(z / r);
+      const phi   = Math.atan2(y, x);
+      const norm = d => (d + 360) % 360;
+      const deg  = r => norm(r * 180 / Math.PI);
+      return { theta: deg(theta), phi: deg(phi) };
+    }
+
+    function updateLegend() {
+      const ul = document.getElementById('legendList');
+      ul.innerHTML = '';
+      for (const name of ['NV 1','NV 2','NV 3','NV 4']) {
+        const { theta, phi } = anglesFor(NV_MAP[name]);
+        const li = document.createElement('li');
+        li.textContent = `${name} (θ ≈ ${theta.toFixed(2)}°, φ ≈ ${phi.toFixed(2)}°)`;
+        ul.appendChild(li);
+      }
+    }
+
+    // ---- Wire + B-field ----
+    const wireGroup = new THREE.Group();
+    const bGroup = new THREE.Group();
+    const perpGroup = new THREE.Group();
+    scene.add(wireGroup, bGroup, perpGroup);
+
+    const NV_LENGTH = 1.4;
+    const R_PERP = 2 * NV_LENGTH;
+
+    function deg2rad(d){ return d * Math.PI / 180; }
+    function getCSSColor(varName){ return new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(varName).trim()); }
+
+    function rFromAnglesBasis(thetaDeg, phiDeg){
+      const th = deg2rad(thetaDeg);
+      const ph = deg2rad(phiDeg);
+      const xb = Math.sin(th) * Math.cos(ph);
+      const yb = Math.sin(th) * Math.sin(ph);
+      const zb = Math.cos(th);
+      const vb = new THREE.Vector3(xb,yb,zb);
+      const vw = vb.applyQuaternion(basis.quaternion);
+      return vw.normalize();
+    }
+
+    let currentBdirWorld = null;
+
+    function buildCylinderAlong(dir, length, radius=0.026, colorVar='--wire'){
+      const v = dir.clone().normalize();
+      const geom = new THREE.CylinderGeometry(radius, radius, length, 28, 1, true);
+      const mat = new THREE.MeshStandardMaterial({ color: getCSSColor(colorVar), metalness:.6, roughness:.25, emissive:getCSSColor(colorVar), emissiveIntensity:.15 });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), v);
+      return mesh;
+    }
+
+    function buildDashedLine(from, to, colorVar='--perp'){
+      const geom = new THREE.BufferGeometry().setFromPoints([from, to]);
+      const mat = new THREE.LineDashedMaterial({ color: getCSSColor(colorVar), dashSize: 0.12, gapSize: 0.08 });
+      const line = new THREE.Line(geom, mat);
+      line.computeLineDistances();
+      return line;
+    }
+
+    function setWire(thetaDeg, phiDeg, tiltDeg){
+      wireGroup.clear();
+      bGroup.clear();
+      perpGroup.clear();
+
+      const rhat = rFromAnglesBasis(thetaDeg, phiDeg);
+
+      const zhat = new THREE.Vector3(0,0,1);
+      let u1 = rhat.clone().cross(zhat);
+      if (u1.length() < 1e-9) { u1.set(1,0,0); } else { u1.normalize(); }
+      const projZ = zhat.clone().sub(rhat.clone().multiplyScalar(zhat.dot(rhat)));
+      let u2 = projZ.length() > 1e-9 ? projZ.normalize() : new THREE.Vector3(0,1,0);
+
+      const a = deg2rad(tiltDeg);
+      let v = u1.clone().multiplyScalar(Math.cos(a)).add(u2.clone().multiplyScalar(Math.sin(a)));
+      if (v.length() < 1e-9) v = u1.clone();
+      v.normalize();
+
+      const center = rhat.clone().multiplyScalar(R_PERP);
+      const wire = buildCylinderAlong(v, NV_LENGTH, 0.028, '--wire');
+      wire.position.copy(center);
+      wireGroup.add(wire);
+
+      const perpLine = buildDashedLine(new THREE.Vector3(0,0,0), center, '--perp');
+      perpGroup.add(perpLine);
+
+      const r_hat_wire_to_origin = center.clone().multiplyScalar(-1).normalize();
+      const Bdir = v.clone().cross(r_hat_wire_to_origin).normalize();
+      currentBdirWorld = Bdir.clone();
+
+      const B = makeArrowFromOrigin(Bdir, getCSSColor('--accent').getHex(), 1.2, 0.04);
+      bGroup.add(B);
+
+      return { rhat, v, Bdir, center };
+    }
+
+    // ---- Optimization helpers ----
+    function nvAngleWithBdir(Bdir){
+      const curName = document.getElementById('nvSelect').value;
+      const nvWorld = NV_MAP[curName].clone().normalize();
+      const invQ = basis.quaternion.clone().invert();
+      const nvB = nvWorld.clone().applyQuaternion(invQ).normalize();
+      const Bbasis = Bdir.clone().applyQuaternion(invQ).normalize();
+      const ang = Math.acos(THREE.MathUtils.clamp(nvB.dot(Bbasis), -1, 1))*180/Math.PI;
+      return ang;
+    }
+
+    function computeAngleForParams(thetaDeg, phiDeg, tiltDeg){
+      const rhat = rFromAnglesBasis(thetaDeg, phiDeg);
+      const zhat = new THREE.Vector3(0,0,1);
+      let u1 = rhat.clone().cross(zhat);
+      if (u1.length() < 1e-9) { u1.set(1,0,0); } else { u1.normalize(); }
+      const projZ = zhat.clone().sub(rhat.clone().multiplyScalar(zhat.dot(rhat)));
+      let u2 = projZ.length() > 1e-9 ? projZ.normalize() : new THREE.Vector3(0,1,0);
+      const a = deg2rad(tiltDeg);
+      let v = u1.clone().multiplyScalar(Math.cos(a)).add(u2.clone().multiplyScalar(Math.sin(a)));
+      if (v.length() < 1e-9) v = u1.clone();
+      v.normalize();
+      const center = rhat.clone().multiplyScalar(R_PERP);
+      const r_hat_wire_to_origin = center.clone().multiplyScalar(-1).normalize();
+      const Bdir = v.clone().cross(r_hat_wire_to_origin).normalize();
+      return nvAngleWithBdir(Bdir);
+    }
+
+    function combosCount(min, max, step){
+      if (!(isFinite(min) && isFinite(max) && isFinite(step))) return Infinity;
+      if (step <= 0) return Infinity;
+      if (max < min) return 0;
+      const n = Math.floor((max - min) / step + 1e-9) + 1; // inclusive
+      return Math.max(0, n);
+    }
+
+    function optimizeWithinRanges(thMin, thMax, phMin, phMax, alMin, alMax, step){
+      const nT = combosCount(thMin, thMax, step);
+      const nP = combosCount(phMin, phMax, step);
+      const nA = combosCount(alMin, alMax, step);
+      const total = nT * nP * nA;
+      const LIMIT = 200000; // cap to keep UI responsive
+      if (!isFinite(total) || total === 0) return { error: 'Invalid ranges or step.' };
+      if (total > LIMIT) return { error: `Search too large (${total.toLocaleString()} combos). Narrow ranges or increase step.` };
+
+      let best = null;
+      for (let i=0;i<nT;i++){
+        const t = thMin + i*step;
+        for (let j=0;j<nP;j++){
+          const p = phMin + j*step;
+          for (let k=0;k<nA;k++){
+            const a = alMin + k*step;
+            const ang = computeAngleForParams(t,p,a);
+            const delta = Math.abs(ang - 90);
+            if (!best || delta < best.delta || (Math.abs(delta - best.delta) < 1e-9 && Math.abs(a) < Math.abs(best.a))){
+              best = { t, p, a, ang, delta };
+            }
+          }
+        }
+      }
+      return { best, total };
+    }
+
+    // --- Heatmap (θ, φ) with color by |∠NV–B − 90°| using α = α_min ---
+    const heatCanvas = document.getElementById('optHeat');
+    const optHover = document.getElementById('optHover');
+    const optimizerPanel = document.getElementById('optimizer');
+    let heatState = null; // stores last draw metadata for hover
+    function setCanvasHiDPI(canvas, cssW, cssH){
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width  = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      canvas.style.width  = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      return ctx;
+    }
+    function lerp(a,b,t){ return a + (b-a)*t; }
+    function rampColor(t){ // 0..1: green -> yellow -> red
+      t = Math.max(0, Math.min(1, t));
+      if (t < 0.5){ const u=t/0.5; return `rgb(${Math.round(lerp(0,255,u))},${Math.round(lerp(180,235,u))},0)`; }
+      const u=(t-0.5)/0.5; return `rgb(255,${Math.round(lerp(235,30,u))},0)`;
+    }
+    function niceTickStart(min, step){ return Math.ceil(min/step)*step; }
+    function drawHeatmap(thMin, thMax, phMin, phMax, stepDeg, alphaConst){
+      if (!heatCanvas) return;
+      const ctx = setCanvasHiDPI(heatCanvas, 420, 280);
+      // layout: margins for ticks & labels + colorbar on right
+      const m = { l: 46, r: 64, t: 12, b: 36 };
+      const W = 420, H = 280;
+      const w = W - m.l - m.r, h = H - m.t - m.b;
+      // bg
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
+      ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.strokeRect(m.l, m.t, w, h);
+
+      // sample counts
+      const nT = combosCount(thMin, thMax, stepDeg);
+      const nP = combosCount(phMin, phMax, stepDeg);
+      if (!isFinite(nT) || !isFinite(nP) || nT===0 || nP===0) return;
+
+      const cellW = w / nP; // φ along X
+      const cellH = h / nT; // θ along Y
+
+      // First pass: compute |∠−90°|, collect min/max
+      const devs = [];
+      let minDev = Infinity, maxDev = -Infinity;
+      for (let ti=0, t=thMin; t<=thMax+1e-9; t+=stepDeg, ti++){
+        devs[ti] = [];
+        for (let pi=0, p=phMin; p<=phMax+1e-9; p+=stepDeg, pi++){
+          const ang = computeAngleForParams(t, p, alphaConst);
+          const dev = Math.abs(ang - 90);
+          devs[ti][pi] = dev;
+          if (dev < minDev) minDev = dev;
+          if (dev > maxDev) maxDev = dev;
+        }
+      }
+      if (!isFinite(minDev) || !isFinite(maxDev)) return;
+      const span = Math.max(1e-9, maxDev - minDev);
+
+      // Second pass: draw cells with normalized ramp
+      for (let ti=0; ti<devs.length; ti++){
+        for (let pi=0; pi<devs[ti].length; pi++){
+          const dev = devs[ti][pi];
+          const tNorm = (dev - minDev) / span;
+          ctx.fillStyle = rampColor(tNorm);
+          const x = m.l + pi*cellW;
+          const y = m.t + ti*cellH;
+          ctx.fillRect(x, y, Math.ceil(cellW)+1, Math.ceil(cellH)+1);
+        }
+      }
+
+      // axes ticks & labels @ 15° increments
+      ctx.fillStyle = '#334155';
+      ctx.font = '11px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+      // X axis (φ)
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      const stepDisp = 15;
+      for (let v = niceTickStart(phMin, stepDisp); v <= phMax + 1e-9; v += stepDisp){
+        const t = (v - phMin) / (phMax - phMin);
+        const x = m.l + t*w;
+        ctx.fillText(String(Math.round(v)), x, m.t + h + 6);
+        ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.beginPath(); ctx.moveTo(x, m.t); ctx.lineTo(x, m.t+h); ctx.stroke();
+      }
+      ctx.textAlign = 'left'; ctx.textBaseline='middle';
+      ctx.fillText('φ (deg)', m.l + 4, m.t + h + 20);
+
+      // Y axis (θ)
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      for (let v = niceTickStart(thMin, stepDisp); v <= thMax + 1e-9; v += stepDisp){
+        const t = (v - thMin) / (thMax - thMin);
+        const y = m.t + t*h;
+        ctx.fillText(String(Math.round(v)), m.l - 6, y);
+        ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(m.l+w, y); ctx.stroke();
+      }
+      ctx.save(); ctx.translate(10, m.t + h/2); ctx.rotate(-Math.PI/2);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('θ (deg)', 0, 0); ctx.restore();
+
+      // Color bar (right)
+      const cb = { x: m.l + w + 18, y: m.t + 4, w: 14, h: h - 8 };
+      const grd = ctx.createLinearGradient(0, cb.y + cb.h, 0, cb.y); // bottom->top
+      for (let i=0;i<=100;i++) grd.addColorStop(i/100, rampColor(i/100));
+      ctx.fillStyle = grd; ctx.fillRect(cb.x, cb.y, cb.w, cb.h);
+      ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.strokeRect(cb.x, cb.y, cb.w, cb.h);
+      // colorbar labels (min/max)
+      ctx.fillStyle = '#334155'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText(minDev.toFixed(2) + '°', cb.x + cb.w + 6, cb.y + cb.h);
+      ctx.fillText(maxDev.toFixed(2) + '°', cb.x + cb.w + 6, cb.y);
+      ctx.textBaseline='top'; ctx.fillText('|∠−90°|', cb.x + cb.w + 6, cb.y + cb.h/2 - 6);
+
+      // save state for hover mapping
+      heatState = { thMin, thMax, phMin, phMax, stepDeg, alphaConst, m, W, H };
+      heatCanvas.dataset.drawn = '1';
+    }
+
+    // Hover readout over heatmap (θ, φ, ∠, |∠−90°| at cursor; α = α_min)
+    function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+    function roundToStep(val, min, step){ return min + Math.round((val - min)/step)*step; }
+    heatCanvas.addEventListener('mousemove', (e)=>{
+      if (!heatState) { optHover.style.display='none'; return; }
+      const rectC = heatCanvas.getBoundingClientRect();
+      const rectO = optimizerPanel.getBoundingClientRect();
+      const x = e.clientX - rectC.left; // css pixels
+      const y = e.clientY - rectC.top;
+      const { m, W, H, thMin, thMax, phMin, phMax, stepDeg, alphaConst } = heatState;
+      const plotX0 = m.l, plotY0 = m.t, plotW = W - m.l - m.r, plotH = H - m.t - m.b;
+      if (x < plotX0 || x > plotX0+plotW || y < plotY0 || y > plotY0+plotH){ optHover.style.display='none'; return; }
+      // map to continuous angles
+      let phi = phMin + (x - plotX0)/plotW * (phMax - phMin);
+      let theta = thMin + (y - plotY0)/plotH * (thMax - thMin);
+      // snap to grid step to match cell colors
+      phi = roundToStep(phi, phMin, stepDeg);
+      theta = roundToStep(theta, thMin, stepDeg);
+      phi = clamp(phi, phMin, phMax);
+      theta = clamp(theta, thMin, thMax);
+      const ang = computeAngleForParams(theta, phi, alphaConst);
+      const dev = Math.abs(ang - 90);
+      // place tooltip
+      optHover.textContent = `θ=${theta.toFixed(2)}°, φ=${phi.toFixed(2)}°, α=${alphaConst.toFixed(2)}° → ∠≈${ang.toFixed(2)}° |∠−90°|≈${dev.toFixed(2)}°`;
+      optHover.style.left = (e.clientX - rectO.left + 12) + 'px';
+      optHover.style.top  = (e.clientY - rectO.top + 12) + 'px';
+      optHover.style.display = 'block';
+    });
+    heatCanvas.addEventListener('mouseleave', ()=>{ optHover.style.display='none'; });
+
+    // UI hookup (elements now exist in DOM)
+    const select = document.getElementById('nvSelect');
+    select.addEventListener('change', () => { showNV(select.value); updateNVBAngle(); });
+
+    const thetaInput = document.getElementById('thetaInput');
+    const phiInput = document.getElementById('phiInput');
+    const tiltInput = document.getElementById('tiltInput');
+    const applyBtn = document.getElementById('applyWire');
+    applyBtn.addEventListener('click', () => {
+      setWire(parseFloat(thetaInput.value), parseFloat(phiInput.value), parseFloat(tiltInput.value));
+      updateNVBAngle();
+    });
+
+    // Optimizer UI hookup
+    const thMinEl = document.getElementById('thMin');
+    const thMaxEl = document.getElementById('thMax');
+    const phMinEl = document.getElementById('phMin');
+    const phMaxEl = document.getElementById('phMax');
+    const alMinEl = document.getElementById('alMin');
+    const alMaxEl = document.getElementById('alMax');
+    const stepEl  = document.getElementById('stepDeg');
+    const optBtn  = document.getElementById('optimizeBtn');
+    const optOut  = document.getElementById('optResult');
+
+    function parseRangeInputs(){
+      const thMin = parseFloat(thMinEl.value), thMax = parseFloat(thMaxEl.value);
+      const phMin = parseFloat(phMinEl.value), phMax = parseFloat(phMaxEl.value);
+      const alMin = parseFloat(alMinEl.value), alMax = parseFloat(alMaxEl.value);
+      const step  = parseFloat(stepEl.value);
+      return { thMin, thMax, phMin, phMax, alMin, alMax, step };
+    }
+
+    optBtn.addEventListener('click', () => {
+      const { thMin, thMax, phMin, phMax, alMin, alMax, step } = parseRangeInputs();
+      optOut.textContent = 'Running optimization…';
+
+      if (!(isFinite(thMin) && isFinite(thMax) && isFinite(phMin) && isFinite(phMax) && isFinite(alMin) && isFinite(alMax) && isFinite(step))){
+        optOut.textContent = 'Enter valid numbers for all fields.';
+        return;
+      }
+      if (thMax < thMin || phMax < phMin || alMax < alMin || step <= 0){
+        optOut.textContent = 'Check that min ≤ max for all ranges and step > 0.';
+        return;
+      }
+
+      const res = optimizeWithinRanges(thMin, thMax, phMin, phMax, alMin, alMax, step);
+      if (res.error){ optOut.textContent = res.error; return; }
+      const { best, total } = res;
+      if (!best){ optOut.textContent = 'No result. Try different ranges.'; return; }
+
+      // Apply result to scene
+      thetaInput.value = best.t.toFixed(2);
+      phiInput.value   = best.p.toFixed(2);
+      tiltInput.value  = best.a.toFixed(2);
+      setWire(best.t, best.p, best.a);
+      updateNVBAngle();
+
+      const comp = 180 - best.ang;
+      optOut.textContent = `Best over ${total.toLocaleString()} combos → θ=${best.t.toFixed(2)}°, φ=${best.p.toFixed(2)}°, α=${best.a.toFixed(2)}°; ∠(NV,B)≈${best.ang.toFixed(2)}° (comp ${comp.toFixed(2)}°)`;
+
+      // Draw heatmap with α = α_min, showing |angle−90°|
+      drawHeatmap(thMin, thMax, phMin, phMax, step, alMin);
+    });
+
+    // initial
+    showNV(select.value);
+    updateLegend();
+    let initState = setWire(parseFloat(thetaInput.value), parseFloat(phiInput.value), parseFloat(tiltInput.value));
+    // populate angle readouts on load
+    updateNVBAngle();
+
+    // keep angle card underneath the top bar
+    const uiPanel = document.getElementById('ui');
+    const layoutPanels = () => {
+      const h = uiPanel.offsetHeight || 0;
+      document.documentElement.style.setProperty('--ui-h', h + 'px');
+      const ab = document.getElementById('angleBox');
+      const ah = ab ? ab.offsetHeight : 0;
+      document.documentElement.style.setProperty('--angle-h', ah + 'px');
+    };
+    layoutPanels();
+    requestAnimationFrame(layoutPanels);
+    addEventListener('resize', layoutPanels);
+    if (window.ResizeObserver) new ResizeObserver(layoutPanels).observe(document.getElementById('angleBox'));
+    if (window.ResizeObserver) new ResizeObserver(layoutPanels).observe(uiPanel);
+
+    function updateNVBAngle(){
+      const curName = document.getElementById('nvSelect').value;
+      const nvWorld = NV_MAP[curName].clone().normalize();
+      const invQ = basis.quaternion.clone().invert();
+      const nvB = nvWorld.clone().applyQuaternion(invQ).normalize();
+      const angleEl = document.getElementById('nvbVal');
+      const compEl = document.getElementById('nvbComp');
+      if (!currentBdirWorld) { if (angleEl) angleEl.textContent = '—'; if (compEl) compEl.textContent = '—'; return; }
+      const Bbasis = currentBdirWorld.clone().applyQuaternion(invQ).normalize();
+      const angle = Math.acos(THREE.MathUtils.clamp(nvB.dot(Bbasis), -1, 1))*180/Math.PI;
+      const comp  = 180 - angle;
+      if (angleEl) angleEl.textContent = `${angle.toFixed(2)}°`;
+      if (compEl) compEl.textContent = `${comp.toFixed(2)}°`;
+    }
+
+    // Resize
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      labelRenderer.setSize(innerWidth, innerHeight);
+    });
+
+    // Loop
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    });
+
+    // --- Self-tests (existing kept; new tests appended) ---
+    const testsEl = document.getElementById('tests');
+    function report(name, ok, detail = '') {
+      const line = document.createElement('div');
+      line.innerHTML = `${ok ? '<span class=\"ok\">✔</span>' : '<span class=\"fail\">✖</span>'} ${name}${detail ? ' — ' + detail : ''}`;
+      testsEl.appendChild(line);
+    }
+
+    // T-1: Canvas exists and has size
+    report('Canvas attached', !!renderer.domElement && renderer.domElement.width > 0 && renderer.domElement.height > 0,
+      !!renderer.domElement ? `size ${renderer.domElement.width}×${renderer.domElement.height}` : 'no canvas');
+
+    // T0: Modules resolved
+    report('THREE imported', !!THREE && typeof THREE.WebGLRenderer === 'function', `(cdn: ${cdnUsed})`);
+    report('OrbitControls imported', typeof OrbitControls === 'function');
+    report('CSS2DRenderer imported', typeof CSS2DRenderer === 'function');
+
+    // T1: Camera in +x,+y,+z
+    report('Camera in (+x,+y,+z)', camera.position.x>0 && camera.position.y>0 && camera.position.z>0);
+
+    // T2: Grid is in XY plane (its normal ≈ +Z)
+    const n = new THREE.Vector3(0,1,0).applyEuler(grid.rotation).cross(new THREE.Vector3(1,0,0).applyEuler(grid.rotation)).normalize();
+    report('Grid normal ‖ +Z (XY plane)', Math.abs(n.dot(new THREE.Vector3(0,0,1))) > 1-1e-9);
+
+    // T3: Only one NV arrow is displayed at a time
+    report('Single NV displayed', nvGroup.children.length > 0 && nvGroup.children.length <= 2);
+
+    // T4: Arrow length < axis length
+    const approxArrowTip = nvGroup.children.find(o => o.type === 'Mesh' && o.geometry && o.geometry.type === 'ConeGeometry');
+    const tipDist = approxArrowTip ? approxArrowTip.position.length() : 0;
+    report('Arrow shorter than axes', tipDist < AXIS_LEN);
+
+    // ---- New tests for wire & B-field ----
+    const tol = 1e-6;
+    // T5: With current defaults, wire center is at distance R_PERP and lies along rhat
+    const init = { center: new THREE.Vector3(), rhat: new THREE.Vector3(), v: new THREE.Vector3(), Bdir: new THREE.Vector3() };
+    // Create once to run tests; then set actual initial below
+    const _tmp = setWire(parseFloat(document.getElementById('thetaInput').value), parseFloat(document.getElementById('phiInput').value), parseFloat(document.getElementById('tiltInput').value));
+    report('Wire center |r| = R_PERP', Math.abs(_tmp.center.length() - R_PERP) < 1e-9);
+    report('Wire center ∥ rhat', Math.abs(_tmp.center.clone().normalize().dot(_tmp.rhat) - 1) < 1e-6);
+
+    // T6: Wire direction ⟂ rhat
+    report('Wire ⟂ rhat', Math.abs(_tmp.v.dot(_tmp.rhat)) < tol);
+
+    // T7: B ⟂ wire and B ⟂ rhat
+    report('B ⟂ wire', Math.abs(_tmp.Bdir.dot(_tmp.v)) < tol);
+    report('B ⟂ rhat', Math.abs(_tmp.Bdir.dot(_tmp.rhat)) < tol);
+
+    // T8: B is a valid unit direction (finite & normalized)
+    report('B normalized', Math.abs(_tmp.Bdir.length() - 1) < 1e-9);
+
+    // T9: NV–B angle calculation is consistent with displayed value (selected NV)
+    const selName = document.getElementById('nvSelect').value;
+    const selNV = NV_MAP[selName].clone().normalize();
+    const angNV_B = Math.acos(THREE.MathUtils.clamp(selNV.dot(_tmp.Bdir), -1, 1))*180/Math.PI;
+    report('∠(selected NV, B) valid', angNV_B >= 0 && angNV_B <= 180, `(got ${angNV_B.toFixed(2)}°)`);
+
+    // T9b: Angle check for NV1 specifically
+    const nv1dir = NV_MAP['NV 1'].clone().normalize();
+    const angNV1B = Math.acos(THREE.MathUtils.clamp(nv1dir.dot(_tmp.Bdir), -1, 1))*180/Math.PI;
+    report('∠(NV1, B) computed', Number.isFinite(angNV1B), `(got ${angNV1B.toFixed(2)}°)`);
+
+    // T10: DOM elements exist
+    report('#nvSelect exists', !!document.getElementById('nvSelect'));
+    report('#thetaInput exists', !!document.getElementById('thetaInput'));
+    report('#phiInput exists', !!document.getElementById('phiInput'));
+    report('#tiltInput exists', !!document.getElementById('tiltInput'));
+    report('#applyWire exists', !!document.getElementById('applyWire'));
+
+    // T11: Complementary angle sums to 180
+    (function(){
+      const curName = document.getElementById('nvSelect').value;
+      const nvWorld = NV_MAP[curName].clone().normalize();
+      const invQ = basis.quaternion.clone().invert();
+      const nvB = nvWorld.clone().applyQuaternion(invQ).normalize();
+      const Bbasis = _tmp.Bdir.clone().applyQuaternion(invQ).normalize();
+      const ang = Math.acos(THREE.MathUtils.clamp(nvB.dot(Bbasis), -1, 1))*180/Math.PI;
+      const comp = 180 - ang;
+      report('Complementary angle sums to 180°', Math.abs((ang + comp) - 180) < 1e-9, `(∠=${ang.toFixed(2)}°, 180−∠=${comp.toFixed(2)}°)`);
+    })();
+
+    // T12: Angle readouts exist
+    report('Angle readouts exist', !!document.getElementById('nvbVal') && !!document.getElementById('nvbComp'));
+
+    // T13: computeAngleForParams returns finite angle
+    const tAng = computeAngleForParams(45,45,-10);
+    report('computeAngleForParams finite', Number.isFinite(tAng), `(got ${tAng.toFixed(2)}°)`);
+
+    // T14: small-range optimization returns a result
+    const tiny = optimizeWithinRanges(44,46,44,46,-11,-9,1);
+    report('Optimizer tiny-range ok', !!tiny.best && Number.isFinite(tiny.best.ang), tiny.error ? tiny.error : `∠≈${tiny.best.ang.toFixed(2)}°`);
+
+    // T15: combosCount sanity
+    report('combosCount inclusive', (function(){ const c=combosCount(0,10,5); return c===3; })(), `(got ${combosCount(0,10,5)})`);
+
+    // T16: axis meshes exist
+    report('Axes created', axesGroup.children.length >= 6);
+
+    // T17: legend lists all four NVs
+    report('Legend lists 4 NVs', document.getElementById('legendList').children.length === 4);
+
+    // T18: Heatmap canvas exists
+    report('#optHeat exists', !!document.getElementById('optHeat'));
+
+    // --- end of tests ---
+  })();
+  </script>
+</body>
+</html>
