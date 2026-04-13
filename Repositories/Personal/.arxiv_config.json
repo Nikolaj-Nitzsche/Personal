@@ -1,0 +1,45 @@
+{
+  "refresh_interval_hours": 12,
+  "max_results": 20,
+  "output": "arxiv_results.html",
+  "sections": [
+    {
+      "label": "General NV centers",
+      "keywords": [
+        "NV-centers",
+        "nitrogen-vacancy"
+      ],
+      "mode": "any",
+      "max_results": 30
+    },
+    {
+      "label": "Quantum cryo NV centers",
+      "keywords": [
+        "quantum",
+        "cryo",
+        "NV",
+        "centers"
+      ],
+      "mode": "all",
+      "max_results": 30
+    },
+    {
+      "label": "NV mK",
+      "keywords": [
+        "NV-centers",
+        "mK"
+      ],
+      "mode": "all"
+    },
+    {
+      "label": "Dilution refrigerators NV centers",
+      "keywords": [
+        "dilution",
+        "refrigerator",
+        "NV",
+        "centers"
+      ],
+      "mode": "all"
+    }
+  ]
+}

@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NV Centers with External Magnetic Field and ESR</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            max-width: 350px;
+        }
+        .vector-info {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .vector-a { color: #ff0000; }
+        .vector-b { color: #00ff00; }
+        .vector-c { color: #0000ff; }
+        .vector-d { color: #ff00ff; }
+        .vector-b-field { color: #ff8800; font-weight: bold; }
+        .dot-products {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(240, 240, 240, 0.8);
+            border-radius: 3px;
+        }
+        .dot-product {
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+	#esr-container {
+    		position: absolute;
+    		bottom: 10px;
+    		right: 10px;
+    		background: rgba(255, 255, 255, 0.95);
+    		padding: 15px;
+    		border-radius: 5px;
+    		box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+		}
+        input[type="range"] {
+            width: 150px;
+            margin: 5px 0;
+        }
+        .control-group {
+            margin: 10px 0;
+        }
+        label {
+            display: inline-block;
+            width: 80px;
+            font-size: 14px;
+        }
+        hr {
+            margin: 10px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+        .angle-info {
+            font-size: 12px;
+            color: #666;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="info">
+        <h3>NV Center Orientations</h3>
+        <div class="vector-info vector-a">u_a = [-0.577, -0.577, -0.577]</div>
+        <div class="vector-info vector-b">u_b = [0.577, 0.577, -0.577]</div>
+        <div class="vector-info vector-c">u_c = [-0.577, 0.577, 0.577]</div>
+        <div class="vector-info vector-d">u_d = [0.577, -0.577, 0.577]</div>
+        <hr>
+        <div class="vector-info vector-b-field" id="b-field-info">B field = [0.408, 0.408, 0.816]</div>
+        <div class="dot-products">
+            <strong>Dot Products (B · u):</strong>
+            <div class="dot-product vector-a" id="dot-a">B · u_a = </div>
+            <div class="dot-product vector-b" id="dot-b">B · u_b = </div>
+            <div class="dot-product vector-c" id="dot-c">B · u_c = </div>
+            <div class="dot-product vector-d" id="dot-d">B · u_d = </div>
+        </div>
+        <br>
+        <small>Drag to rotate, scroll to zoom</small>
+    </div>
+    
+    <div class="controls">
+        <h3>Magnetic Field Control</h3>
+        <div class="control-group">
+            <label>Theta (θ):</label>
+            <input type="range" id="theta" min="0" max="180" value="35" step="1">
+            <span id="theta-value">35°</span>
+        </div>
+        <div class="control-group">
+            <label>Phi (φ):</label>
+            <input type="range" id="phi" min="0" max="360" value="45" step="1">
+            <span id="phi-value">45°</span>
+        </div>
+        <div class="control-group">
+            <label>Magnitude:</label>
+            <input type="range" id="magnitude" min="0.5" max="2" value="1" step="0.1">
+            <span id="magnitude-value">1.0</span>
+        </div>
+        <hr>
+        <div class="control-group">
+            <label>B field (T):</label>
+            <input type="range" id="b-strength" min="0" max="100" value="7" step="1">
+            <span id="b-strength-value">7 mT</span>
+        </div>
+    </div>
+
+    <!-- Add this just below your controls -->
+    <div id="highlight-controls" style="position:absolute;top:250px;right:10px;
+          background:rgba(255,255,255,0.95);padding:10px;border-radius:5px;
+          box-shadow:0 2px 5px rgba(0,0,0,0.2);font-size:13px;">
+      <b>Highlight regions</b><br>
+      <table>
+         <tr><td>uₐ</td>
+          <td><input type="checkbox" id="ua-pos"> +</td>
+          <td><input type="checkbox" id="ua-neg"> −</td></tr>
+        <tr><td>u_b</td>
+          <td><input type="checkbox" id="ub-pos"> +</td>
+          <td><input type="checkbox" id="ub-neg"> −</td></tr>
+        <tr><td>u_c</td>
+          <td><input type="checkbox" id="uc-pos"> +</td>
+          <td><input type="checkbox" id="uc-neg"> −</td></tr>
+        <tr><td>u_d</td>
+          <td><input type="checkbox" id="ud-pos"> +</td>
+          <td><input type="checkbox" id="ud-neg"> −</td></tr>
+      </table>
+    </div>
+
+    <div id="esr-container">
+        <svg width="600" height="300" xmlns="http://www.w3.org/2000/svg" id="esr-svg">
+            <!-- Background -->
+            <rect width="600" height="300" fill="white"/>
+            
+            <!-- Grid lines -->
+            <g stroke="#e0e0e0" stroke-width="1">
+                <line x1="0" y1="150" x2="600" y2="150"/>
+                <line x1="100" y1="0" x2="100" y2="300"/>
+                <line x1="200" y1="0" x2="200" y2="300"/>
+                <line x1="300" y1="0" x2="300" y2="300"/>
+                <line x1="400" y1="0" x2="400" y2="300"/>
+                <line x1="500" y1="0" x2="500" y2="300"/>
+            </g>
+            
+            <!-- ZFS marker -->
+            <line x1="300" y1="0" x2="300" y2="300" stroke="gray" stroke-width="2" stroke-dasharray="5,5"/>
+            <text x="305" y="20" font-family="Arial" font-size="12" fill="gray">ZFS (2.87 GHz)</text>
+            
+            <!-- ESR signal will be dynamically generated -->
+            <path id="esr-signal" stroke="blue" stroke-width="2" fill="none"/>
+            
+            <!-- Axes -->
+            <g stroke="black" stroke-width="2">
+                <line x1="20" y1="280" x2="580" y2="280"/>
+                <line x1="20" y1="20" x2="20" y2="280"/>
+            </g>
+            
+            <!-- Axis labels -->
+            <text x="300" y="295" text-anchor="middle" font-family="Arial" font-size="14">RF frequency (GHz)</text>
+            <text x="10" y="15" text-anchor="middle" font-family="Arial" font-size="14" transform="rotate(-90 10 150)">Intensity</text>
+            
+            <!-- Frequency labels -->
+            <text x="100" y="295" text-anchor="middle" font-family="Arial" font-size="11">2.6</text>
+            <text x="200" y="295" text-anchor="middle" font-family="Arial" font-size="11">2.7</text>
+            <text x="300" y="295" text-anchor="middle" font-family="Arial" font-size="11">2.87</text>
+            <text x="400" y="295" text-anchor="middle" font-family="Arial" font-size="11">3.0</text>
+            <text x="500" y="295" text-anchor="middle" font-family="Arial" font-size="11">3.1</text>
+            
+            <!-- Title -->
+            <text x="300" y="30" text-anchor="middle" font-family="Arial" font-size="16" font-weight="bold">ESR Spectrum</text>
+            
+            <!-- Legend -->
+            <g id="esr-legend" font-family="Arial" font-size="11">
+                <rect x="450" y="50" width="15" height="3" fill="#ff0000"/>
+                <text x="470" y="55">NV-a</text>
+                <rect x="450" y="60" width="15" height="3" fill="#00ff00"/>
+                <text x="470" y="65">NV-b</text>
+                <rect x="450" y="70" width="15" height="3" fill="#0000ff"/>
+                <text x="470" y="75">NV-c</text>
+                <rect x="450" y="80" width="15" height="3" fill="#ff00ff"/>
+                <text x="470" y="85">NV-d</text>
+            </g>
+        </svg>
+    </div>
+
+    <div id="dip-distances" style="
+    	position: absolute;
+    	bottom: 330px;
+    	right: 10px;
+    	background: rgba(255,255,255,0.95);
+    	padding: 10px;
+    	border-radius: 5px;
+    	box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+   	font-family: Arial, sans-serif;
+    	font-size: 13px;
+    	max-width: 200px;
+	">
+    	<strong>Dip Spacings:</strong>
+    	<div id="distance-a" style="color:#ff0000;">NV-a: -- MHz</div>
+    	<div id="distance-b" style="color:#00ff00;">NV-b: -- MHz</div>
+    	<div id="distance-c" style="color:#0000ff;">NV-c: -- MHz</div>
+    	<div id="distance-d" style="color:#ff00ff;">NV-d: -- MHz</div>
+    </div>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
+
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(
+            75, 
+            window.innerWidth / window.innerHeight, 
+            0.1, 
+            1000
+        );
+        camera.position.set(3, 3, 3);
+        camera.lookAt(0, 0, 0);
+
+
+        // Renderer setup
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // Define NV center vectors
+        const sqrt13 = Math.sqrt(1/3);
+        const nvVectors = [
+            { name: 'u_a', coords: [-sqrt13, -sqrt13, -sqrt13], color: 0xff0000 },
+            { name: 'u_b', coords: [sqrt13, -sqrt13, sqrt13], color: 0x00ff00 },
+            { name: 'u_c', coords: [sqrt13, sqrt13, -sqrt13], color: 0x0000ff },
+            { name: 'u_d', coords: [-sqrt13, sqrt13, sqrt13], color: 0xff00ff }
+        ];
+
+        // Magnetic field vector
+        let bFieldArrow;
+        const bFieldColor = 0xff8800;
+        let currentBField = [0, 0, 0];
+        let dotProducts = [0, 0, 0, 0];
+
+        // ESR parameters
+        const ZFS = 2.87; // GHz
+        const gyromagneticRatio = 28; // GHz/T
+
+        // Function to calculate dot product
+        function dotProduct(v1, v2) {
+            return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+        }
+
+        // Function to calculate angle between vectors
+        function angleBetweenVectors(v1, v2) {
+            const dot = dotProduct(v1, v2);
+            const mag1 = Math.sqrt(dotProduct(v1, v1));
+            const mag2 = Math.sqrt(dotProduct(v2, v2));
+            const cosAngle = dot / (mag1 * mag2);
+            const clampedCos = Math.max(-1, Math.min(1, cosAngle));
+            return Math.acos(clampedCos) * 180 / Math.PI;
+        }
+
+        // Function to create arrow
+        function createArrow(vector, color, thickness = 1) {
+            const origin = new THREE.Vector3(0, 0, 0);
+            const direction = new THREE.Vector3(...vector.coords);
+            const length = direction.length();
+            direction.normalize();
+
+            const arrowHelper = new THREE.ArrowHelper(
+                direction,
+                origin,
+                length,
+                color,
+                length * 0.2,
+                length * 0.1
+            );
+            
+            if (thickness > 1) {
+                arrowHelper.line.material.linewidth = thickness;
+            }
+            
+            return arrowHelper;
+        }
+
+        // Add NV vectors to scene
+        nvVectors.forEach(vec => {
+            const arrow = createArrow(vec, vec.color);
+            scene.add(arrow);
+        });
+
+	// === create sample points on the unit sphere ==============================
+	const N = 5000;
+	const spherePositions = new Float32Array(N*3);
+	for(let i=0;i<N;i++){
+  	  const u=Math.random(), v=Math.random();
+  	  const theta=2*Math.PI*u, phi=Math.acos(2*v-1);
+  	  spherePositions[3*i]   = Math.sin(phi)*Math.cos(theta);
+  	  spherePositions[3*i+1] = Math.sin(phi)*Math.sin(theta);
+  	  spherePositions[3*i+2] = Math.cos(phi);
+	}
+
+	const geomPts = new THREE.BufferGeometry();
+	geomPts.setAttribute('position', new THREE.BufferAttribute(spherePositions, 3));
+
+	// initialize per‑vertex colors once
+	const initCols = new Float32Array(N * 3);
+	for (let i = 0; i < N; i++) {
+	  initCols[3*i]   = 0.8; // light‑gray default
+	  initCols[3*i+1] = 0.8;
+	  initCols[3*i+2] = 0.8;
+	}
+	geomPts.setAttribute('color', new THREE.BufferAttribute(initCols, 3));
+
+	const matPts = new THREE.PointsMaterial({
+	  size: 0.02,
+	  vertexColors: true,    // <-- key change
+	  transparent: true,
+	  opacity: 0.9
+	});
+
+	const pointsSphere = new THREE.Points(geomPts, matPts);
+	scene.add(pointsSphere);
+
+	// === helper to check current toggle state =================================
+	function getToggles(){
+  	  return {
+    	    ua:[document.getElementById('ua-pos').checked,
+        	document.getElementById('ua-neg').checked],
+    	    ub:[document.getElementById('ub-pos').checked,
+        	document.getElementById('ub-neg').checked],
+    	    uc:[document.getElementById('uc-pos').checked,
+        	document.getElementById('uc-neg').checked],
+    	    ud:[document.getElementById('ud-pos').checked,
+        	document.getElementById('ud-neg').checked]
+  	  };
+	}
+
+	// === function to recolor surface ==========================================
+	function updateHighlights() {
+	  const tgl = getToggles();
+	  const arr = geomPts.attributes.position.array;
+	  const cols = geomPts.attributes.color.array;
+
+	  for (let i = 0; i < N; i++) {
+	    const p = [arr[3*i], arr[3*i+1], arr[3*i+2]];
+	    let keep = true;
+
+	    for (let j = 0; j < nvVectors.length; j++) {
+	      const u = nvVectors[j].coords;
+	      const dot = p[0]*u[0] + p[1]*u[1] + p[2]*u[2];
+	      const pos = (dot > 0), neg = (dot < 0);
+	      const tag = ['ua','ub','uc','ud'][j];
+	      const [showPos, showNeg] = tgl[tag];
+	      if (showPos || showNeg) {
+	        if (!((pos && showPos) || (neg && showNeg))) { keep = false; break; }
+	      }
+	    }
+
+	    if (keep) {
+ 	     cols[3*i]   = 1.0;
+ 	     cols[3*i+1] = 0.3;
+ 	     cols[3*i+2] = 0.3;
+	    } else {
+ 	     cols[3*i]   = 0.8;
+ 	     cols[3*i+1] = 0.8;
+ 	     cols[3*i+2] = 0.8;
+ 	   }
+ 	 }
+
+	  geomPts.attributes.color.needsUpdate = true;
+	}
+	['ua-pos','ua-neg','ub-pos','ub-neg','uc-pos','uc-neg','ud-pos','ud-neg']
+  	  .forEach(id=>document.getElementById(id).addEventListener('change',updateHighlights));
+
+
+        // Function to update ESR spectrum
+        function updateESRSpectrum() {
+            const bStrength = parseFloat(document.getElementById('b-strength').value) / 1000; // Convert mT to T
+            
+            // Calculate frequency shifts for each NV
+            const freqShifts = dotProducts.map(dot => gyromagneticRatio * bStrength * Math.abs(dot));
+            
+	    // Calculate dip spacing in MHz
+	    nvVectors.forEach((vec, idx) => {
+    	    	const shiftGHz = freqShifts[idx];
+    		const spacingGHz = 2 * shiftGHz; // distance between left and right dip
+    		const spacingMHz = spacingGHz * 1000; // convert to MHz
+    		const label = document.getElementById(`distance-${vec.name.split('_')[1]}`);
+    		if (label) {
+        	    label.textContent = `${vec.name.toUpperCase()}: ${spacingMHz.toFixed(1)} MHz`;
+    		}
+	    });
+
+            // Generate ESR path
+            let pathData = 'M 20,150 ';
+            const baseY = 150;
+            const width = 560;
+            const freqRange = 0.6; // GHz range shown (2.6 to 3.2 GHz)
+            const centerX = 300; // ZFS position
+            
+            // Create dips for each NV orientation
+            const dipWidth = 15;
+            const dipPositions = [];
+            
+            nvVectors.forEach((vec, idx) => {
+                const shift = freqShifts[idx];
+                // Two dips per NV (ms = +1 and ms = -1)
+                const leftDip = centerX - (shift / freqRange) * width;
+                const rightDip = centerX + (shift / freqRange) * width;
+                
+                // Dip depth proportional to dot product
+                const depth = 50 + Math.abs(dotProducts[idx]) * 80; // 50 to 130 pixels
+                
+                dipPositions.push({
+                    left: leftDip,
+                    right: rightDip,
+                    depth: depth,
+                    color: vec.color
+                });
+            });
+            
+            // Sort dips by position for smooth curve
+            const allDips = [];
+            dipPositions.forEach((dip, idx) => {
+                allDips.push({ x: dip.left, depth: dip.depth, idx: idx });
+                allDips.push({ x: dip.right, depth: dip.depth, idx: idx });
+            });
+            allDips.sort((a, b) => a.x - b.x);
+            
+            // Generate smooth curve through dips
+            let x = 20;
+            for (let i = 0; i < allDips.length; i++) {
+                const dip = allDips[i];
+                const dipX = Math.max(20, Math.min(580, dip.x));
+                
+                if (dipX > x + 5) {
+                    pathData += `L ${dipX - dipWidth},${baseY} `;
+                    pathData += `C ${dipX - dipWidth/2},${baseY} ${dipX - dipWidth/2},${baseY + dip.depth/2} ${dipX},${baseY + dip.depth} `;
+                    pathData += `C ${dipX + dipWidth/2},${baseY + dip.depth/2} ${dipX + dipWidth/2},${baseY} ${dipX + dipWidth},${baseY} `;
+                    x = dipX + dipWidth;
+                }
+            }
+            pathData += `L 580,${baseY}`;
+            
+            // Update the path
+            document.getElementById('esr-signal').setAttribute('d', pathData);
+            
+            // Add colored markers for each dip
+            const markers = document.getElementById('esr-markers') || createMarkerGroup();
+            markers.innerHTML = '';
+            
+            dipPositions.forEach((dip, idx) => {
+                // Left dip marker
+                if (dip.left > 20 && dip.left < 580) {
+                    const leftMarker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    leftMarker.setAttribute('cx', dip.left);
+                    leftMarker.setAttribute('cy', baseY + dip.depth);
+                    leftMarker.setAttribute('r', '3');
+                    leftMarker.setAttribute('fill', `#${dip.color.toString(16).padStart(6, '0')}`);
+                    markers.appendChild(leftMarker);
+                }
+                
+                // Right dip marker
+                if (dip.right > 20 && dip.right < 580) {
+                    const rightMarker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    rightMarker.setAttribute('cx', dip.right);
+                    rightMarker.setAttribute('cy', baseY + dip.depth);
+                    rightMarker.setAttribute('r', '3');
+                    rightMarker.setAttribute('fill', `#${dip.color.toString(16).padStart(6, '0')}`);
+                    markers.appendChild(rightMarker);
+                }
+            });
+        }
+        
+        function createMarkerGroup() {
+            const svg = document.getElementById('esr-svg');
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('id', 'esr-markers');
+            svg.appendChild(group);
+            return group;
+        }
+
+        // Function to update dot products display
+        function updateDotProducts() {
+            nvVectors.forEach((vec, index) => {
+                const dot = dotProduct(currentBField, vec.coords);
+                dotProducts[index] = dot;
+                const angle = angleBetweenVectors(currentBField, vec.coords);
+                const elementId = `dot-${vec.name.split('_')[1]}`;
+                const element = document.getElementById(elementId);
+                
+                // Color code based on dot product value
+                let bgColor = '';
+                if (Math.abs(dot) < 0.1) {
+                    bgColor = 'rgba(255, 255, 0, 0.3)'; // Yellow for nearly perpendicular
+                } else if (dot > 0.5) {
+                    bgColor = 'rgba(0, 255, 0, 0.2)'; // Green for aligned
+                } else if (dot < -0.5) {
+                    bgColor = 'rgba(255, 0, 0, 0.2)'; // Red for anti-aligned
+                }
+                
+                element.innerHTML = `B · ${vec.name} = ${dot.toFixed(3)} <span class="angle-info">(${angle.toFixed(1)}°)</span>`;
+                element.style.backgroundColor = bgColor;
+                element.style.padding = '2px 5px';
+                element.style.borderRadius = '3px';
+            });
+            
+            // Update ESR spectrum
+            updateESRSpectrum();
+        }
+
+        // Function to update B field
+        function updateBField() {
+            const theta = parseFloat(document.getElementById('theta').value) * Math.PI / 180;
+            const phi = parseFloat(document.getElementById('phi').value) * Math.PI / 180;
+            const magnitude = parseFloat(document.getElementById('magnitude').value);
+            
+            const x = magnitude * Math.sin(theta) * Math.cos(phi);
+            const y = magnitude * Math.sin(theta) * Math.sin(phi);
+            const z = magnitude * Math.cos(theta);
+            
+            currentBField = [x, y, z];
+            
+            // Remove old arrow
+            if (bFieldArrow) {
+                scene.remove(bFieldArrow);
+            }
+            
+            // Create new arrow
+            const bVector = { coords: currentBField };
+            bFieldArrow = createArrow(bVector, bFieldColor, 2);
+            scene.add(bFieldArrow);
+            
+            // Update display
+            document.getElementById('b-field-info').textContent = 
+                `B field = [${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)}]`;
+            
+            // Update dot products and ESR
+            updateDotProducts();
+	    updateHighlights();
+        }
+
+        // Initial B field
+        updateBField();
+
+        // Add event listeners for controls
+        document.getElementById('theta').addEventListener('input', (e) => {
+            document.getElementById('theta-value').textContent = e.target.value + '°';
+            updateBField();
+        });
+
+        document.getElementById('phi').addEventListener('input', (e) => {
+            document.getElementById('phi-value').textContent = e.target.value + '°';
+            updateBField();
+        });
+
+        document.getElementById('magnitude').addEventListener('input', (e) => {
+            document.getElementById('magnitude-value').textContent = e.target.value;
+            updateBField();
+        });
+
+        document.getElementById('b-strength').addEventListener('input', (e) => {
+            document.getElementById('b-strength-value').textContent = e.target.value + ' mT';
+            updateESRSpectrum();
+        });
+
+        // Add coordinate axes
+        const axesHelper = new THREE.AxesHelper(1.5);
+        scene.add(axesHelper);
+
+        // Add grid
+        const gridHelper = new THREE.GridHelper(2, 20, 0x888888, 0xcccccc);
+        gridHelper.rotateX(Math.PI / 2);
+        scene.add(gridHelper);
+
+        // Add sphere to show unit sphere
+        const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+        const sphereMaterial = new THREE.MeshPhongMaterial({
+            color: 0x888888,
+            transparent: true,
+            opacity: 0.1,
+            wireframe: true
+        });
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        scene.add(sphere);
+
+        // Add points at NV vector endpoints
+        nvVectors.forEach(vec => {
+            const pointGeometry = new THREE.SphereGeometry(0.05, 16, 16);
+            const pointMaterial = new THREE.MeshPhongMaterial({ color: vec.color });
+            const point = new THREE.Mesh(pointGeometry, pointMaterial);
+            point.position.set(...vec.coords);
+            scene.add(point);
+        });
+
+        // Add labels
+        nvVectors.forEach((vec, index) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 64;
+            
+            context.font = 'Bold 48px Arial';
+            context.fillStyle = `#${vec.color.toString(16).padStart(6, '0')}`;
+            context.fillText(vec.name, 10, 50);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            
+            const endPoint = new THREE.Vector3(...vec.coords);
+            sprite.position.copy(endPoint).multiplyScalar(1.2);
+            sprite.scale.set(0.5, 0.125, 1);
+            scene.add(sprite);
+        });
+
+        // Add B field label
+        const bCanvas = document.createElement('canvas');
+        const bContext = bCanvas.getContext('2d');
+        bCanvas.width = 256;
+        bCanvas.height = 64;
+        
+        bContext.font = 'Bold 48px Arial';
+        bContext.fillStyle = '#ff8800';
+        bContext.fillText('B', 10, 50);
+        
+        const bTexture = new THREE.CanvasTexture(bCanvas);
+        const bSpriteMaterial = new THREE.SpriteMaterial({ map: bTexture });
+        const bSprite = new THREE.Sprite(bSpriteMaterial);
+        bSprite.scale.set(0.3, 0.075, 1);
+        
+        // Update B label position in animation loop
+        function updateBLabel() {
+            if (bFieldArrow) {
+                const theta = parseFloat(document.getElementById('theta').value) * Math.PI / 180;
+                const phi = parseFloat(document.getElementById('phi').value) * Math.PI / 180;
+                const magnitude = parseFloat(document.getElementById('magnitude').value);
+                
+                bSprite.position.set(
+                    magnitude * Math.sin(theta) * Math.cos(phi) * 1.2,
+                    magnitude * Math.sin(theta) * Math.sin(phi) * 1.2,
+                    magnitude * Math.cos(theta) * 1.2
+                );
+            }
+        }
+        
+        scene.add(bSprite);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            updateBLabel();
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>

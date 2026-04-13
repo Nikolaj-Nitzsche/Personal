@@ -1,0 +1,11 @@
+{
+  "keywords": [
+    "quantum",
+    "cryo",
+    "NV-centers"
+  ],
+  "mode": "majority",
+  "refresh_interval_hours": 24,
+  "max_results": 20,
+  "output": "arxiv_results.html"
+}
