@@ -166,7 +166,10 @@ def fetch_feed(query: str, max_results: int = 20) -> str:
         f"&sortBy=submittedDate&sortOrder=descending"
     )
     context = create_ssl_context()
-    with urlopen(url, timeout=20, context=context) as response:
+    from urllib.request import Request
+    headers = {"User-Agent": "arxiv-paper-finder/1.0 (mailto:your_email@example.com)"}
+    req = Request(url, headers=headers)
+    with urlopen(req, timeout=20, context=context) as response:
         return response.read().decode("utf-8")
 
 
@@ -263,8 +266,9 @@ def render_html(section_results: list[dict[str, object]], refresh_interval: int,
                     f"<strong>Keywords:</strong> {keywords_label}</p>" if matched_keywords else
                     f"<p class=\"match-info\">Matched {match_count} of {len(section_keywords)} keywords.</p>"
                 )
+            entry_id = html.escape(entry['id'])
             section_items.append(
-                f"<article>"
+                f"<article data-entry-id=\"{entry_id}\">"
                 f"<h2><a href=\"{entry['link']}\" target=\"_blank\">{title_text}</a> {badge}</h2>"
                 f"<p><strong>Authors:</strong> {authors_text}</p>"
                 f"<p><strong>Published:</strong> {published}</p>"
@@ -331,12 +335,71 @@ def render_html(section_results: list[dict[str, object]], refresh_interval: int,
     </style>
     <script>
       document.addEventListener('DOMContentLoaded', function() {{
-        document.querySelectorAll('article h2 a[target="_blank"]').forEach(function(link) {{
+        function getReadIds() {{
+          try {{
+            return new Set(JSON.parse(localStorage.getItem('arxiv_read_ids') || '[]'));
+          }} catch (error) {{
+            return new Set();
+          }}
+        }}
+
+        function saveReadIds(ids) {{
+          try {{
+            localStorage.setItem('arxiv_read_ids', JSON.stringify(Array.from(ids)));
+          }} catch (error) {{
+            // ignore storage errors
+          }}
+        }}
+
+        function updateSectionBadges() {{
+          document.querySelectorAll('details.section').forEach(function(section) {{
+            var sectionBadge = section.querySelector('.section-badge');
+            if (!sectionBadge) return;
+            var visibleBadges = Array.from(section.querySelectorAll('article .badge')).filter(function(badge) {{
+              return badge.offsetParent !== null;
+            }});
+            if (!visibleBadges.length) {{
+              sectionBadge.style.display = 'none';
+            }}
+          }});
+        }}
+
+        function hideReadBadges() {{
+          var readIds = getReadIds();
+          if (!readIds.size) return;
+          document.querySelectorAll('article[data-entry-id]').forEach(function(article) {{
+            var entryId = article.dataset.entryId;
+            if (readIds.has(entryId)) {{
+              var badge = article.querySelector('.badge');
+              if (badge) {{
+                badge.style.display = 'none';
+              }}
+            }}
+          }});
+          updateSectionBadges();
+        }}
+
+        hideReadBadges();
+
+        document.querySelectorAll('article[data-entry-id] h2 a[target="_blank"]').forEach(function(link) {{
           link.addEventListener('click', function() {{
-            var badge = link.parentElement.querySelector('.badge');
+            var article = link.closest('article');
+            if (!article) return;
+            var entryId = article.dataset.entryId;
+            var readIds = getReadIds();
+            if (entryId) {{
+              readIds.add(entryId);
+              saveReadIds(readIds);
+            }}
+            var badge = article.querySelector('.badge');
             if (badge) {{
               badge.classList.add('fade-out');
-              setTimeout(function() {{ badge.style.display = 'none'; }}, 250);
+              setTimeout(function() {{
+                badge.style.display = 'none';
+                updateSectionBadges();
+              }}, 250);
+            }} else {{
+              updateSectionBadges();
             }}
           }});
         }});
@@ -413,47 +476,16 @@ def main() -> None:
         config_to_save["mode"] = args.mode if args.mode else str(config.get("mode", DEFAULT_CONFIG["mode"]))
     save_config(config_path, config_to_save)
 
+    # --- REFRESH LOGIC MODIFIED ---
+    # Always use the cache if the output file exists and --force-refresh is NOT used.
+    # This disables automatic refreshing and prevents new API calls unless explicitly requested.
     cache_note = ""
-    state = load_state(STATE_STORE)
-    last_fetch = None
-    if state.get("last_fetch"):
-        try:
-            last_fetch = datetime.fromisoformat(state["last_fetch"])
-        except Exception:
-            last_fetch = None
-
-    should_use_cache = False
-    current_query = {
-        "sections": [
-            {
-                "label": section["label"],
-                "keywords": section["keywords"],
-                "mode": section["mode"],
-                "max_results": section["max_results"],
-            }
-            for section in sections
-        ]
-    }
     output_path = Path(output_name)
     if not args.force_refresh and output_path.exists():
-        if last_fetch is not None and state.get("query") == current_query:
-            elapsed = datetime.now() - last_fetch
-            if elapsed < timedelta(hours=refresh_interval):
-                print(f"Using cached results from {last_fetch.isoformat()} (refresh interval {refresh_interval}h).")
-                cache_note = f"Data is cached until {(last_fetch + timedelta(hours=refresh_interval)).isoformat()}. Run with --force-refresh to fetch new results."
-                should_use_cache = True
-        elif not state and output_path.exists():
-            mtime = datetime.fromtimestamp(output_path.stat().st_mtime)
-            elapsed = datetime.now() - mtime
-            if elapsed < timedelta(hours=refresh_interval):
-                print(f"Using cached results from file modified at {mtime.isoformat()} (refresh interval {refresh_interval}h).")
-                cache_note = f"Data is cached until {(mtime + timedelta(hours=refresh_interval)).isoformat()}. Run with --force-refresh to fetch new results."
-                should_use_cache = True
-
-    if should_use_cache:
         print("Using cached report; no new arXiv search is performed.")
+        cache_note = "Data is cached. Run with --force-refresh to fetch new results."
         if not args.no_open:
-            webbrowser.open(Path(output_name).resolve().as_uri())
+            webbrowser.open(output_path.resolve().as_uri())
             print("Opened cached results in your browser.")
         return
 

@@ -40,6 +40,15 @@
         "centers"
       ],
       "mode": "all"
+    },
+    {
+      "label": "Antenna ",
+      "keywords": [
+        "antenna",
+        "NV",
+        "centers"
+      ],
+      "mode": "all"
     }
   ]
 }

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIwIiBmaWxsPSIjMWQ0ZWQ4Ii8+PHBhdGggZD0iTTI4IDU4IEw0NCA0MiBMNTYgNTQgTDcyIDM4IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==">
+    <title>arXiv recent papers by section</title>
+    <style>
+        body { font-family: Inter, Arial, sans-serif; margin: 24px; background: #f4f6f8; color: #111827; }
+        .page { max-width: 980px; margin: auto; }
+        h1 { margin-bottom: 0.25em; font-size: 2.2rem; }
+        .meta { margin-bottom: 0.75em; color: #4b5563; }
+        .status { margin-bottom: 1.5em; padding: 16px; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 12px; color: #4338ca; }
+        .fallback { margin-top: 0.75em; padding: 14px 18px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 12px; color: #92400e; }
+        .cache-note { margin-top: 0.75em; padding: 14px 18px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; color: #1e40af; }
+        article { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 22px; margin-bottom: 18px; box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08); }
+        h2 { margin: 0 0 0.75em; font-size: 1.35rem; }
+        .badge { display: inline-flex; align-items: center; margin-left: 0.75rem; padding: 0.2rem 0.65rem; border-radius: 999px; background: #f97316; color: white; font-size: 0.8rem; letter-spacing: 0.02em; transition: opacity 0.25s ease, transform 0.25s ease; }
+        .badge.fade-out { opacity: 0; transform: scale(0.75); }
+        .match-info { margin: 0.6em 0 0; color: #6b7280; font-size: 0.95rem; }
+        details.section { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px 22px; margin-bottom: 18px; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08); }
+        summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 1.1rem; font-weight: 600; padding: 0; }
+        .section-title { color: #111827; }
+        .section-meta { color: #4b5563; font-size: 0.95rem; }
+        .section-count { background: #eef2ff; color: #1e40af; padding: 0.35rem 0.75rem; border-radius: 999px; font-size: 0.95rem; }
+        .section-badge { display: inline-flex; align-items: center; padding: 0.2rem 0.65rem; border-radius: 999px; background: #f97316; color: white; font-size: 0.8rem; }
+        .section-body { margin-top: 18px; }
+        .section-description { margin-bottom: 0.5rem; color: #374151; }
+        .section-keywords { margin: 0; padding-left: 1.2em; color: #1e40af; }
+        .section-keywords li { margin-bottom: 0.35em; }
+        a { color: #1d4ed8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        p { line-height: 1.75; margin: 0.4em 0; color: #4b5563; }
+        .page-footer { margin-top: 24px; padding: 14px 16px; text-align: center; border-top: 4px solid #2563eb; color: #334155; background: #f8fafc; border-radius: 0 0 16px 16px; font-size: 0.95rem; }
+    </style>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        function getReadIds() {
+          try {
+            return new Set(JSON.parse(localStorage.getItem('arxiv_read_ids') || '[]'));
+          } catch (error) {
+            return new Set();
+          }
+        }
+
+        function saveReadIds(ids) {
+          try {
+            localStorage.setItem('arxiv_read_ids', JSON.stringify(Array.from(ids)));
+          } catch (error) {
+            // ignore storage errors
+          }
+        }
+
+        function updateSectionBadges() {
+          document.querySelectorAll('details.section').forEach(function(section) {
+            var sectionBadge = section.querySelector('.section-badge');
+            if (!sectionBadge) return;
+            var visibleBadges = Array.from(section.querySelectorAll('article .badge')).filter(function(badge) {
+              return badge.offsetParent !== null;
+            });
+            if (!visibleBadges.length) {
+              sectionBadge.style.display = 'none';
+            }
+          });
+        }
+
+        function hideReadBadges() {
+          var readIds = getReadIds();
+          if (!readIds.size) return;
+          document.querySelectorAll('article[data-entry-id]').forEach(function(article) {
+            var entryId = article.dataset.entryId;
+            if (readIds.has(entryId)) {
+              var badge = article.querySelector('.badge');
+              if (badge) {
+                badge.style.display = 'none';
+              }
+            }
+          });
+          updateSectionBadges();
+        }
+
+        hideReadBadges();
+
+        document.querySelectorAll('article[data-entry-id] h2 a[target="_blank"]').forEach(function(link) {
+          link.addEventListener('click', function() {
+            var article = link.closest('article');
+            if (!article) return;
+            var entryId = article.dataset.entryId;
+            var readIds = getReadIds();
+            if (entryId) {
+              readIds.add(entryId);
+              saveReadIds(readIds);
+            }
+            var badge = article.querySelector('.badge');
+            if (badge) {
+              badge.classList.add('fade-out');
+              setTimeout(function() {
+                badge.style.display = 'none';
+                updateSectionBadges();
+              }, 250);
+            } else {
+              updateSectionBadges();
+            }
+          });
+        });
+      });
+    </script>
+</head>
+<body>
+    <div class="page">
+        <h1>arXiv recent papers by section</h1>
+        <p class="meta">Generated: 2026-05-29 11:50:31 | Refresh interval: 12h</p>
+        <div class="status">No new papers since your last run. Config: .arxiv_config.json</div>
+        
+        
+        <div class="page-footer">Designed and built by Nikolaj Nitzsche © 2026</div>
+    </div>
+</body>
+</html>

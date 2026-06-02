@@ -1,5 +1,5 @@
 {
-  "last_fetch": "2026-04-13T15:27:20.609680",
+  "last_fetch": "2026-05-29T11:40:20.650206",
   "query": {
     "sections": [
       {
@@ -36,6 +36,16 @@
         "keywords": [
           "dilution",
           "refrigerator",
+          "NV",
+          "centers"
+        ],
+        "mode": "all",
+        "max_results": 20
+      },
+      {
+        "label": "Antenna",
+        "keywords": [
+          "antenna",
           "NV",
           "centers"
         ],

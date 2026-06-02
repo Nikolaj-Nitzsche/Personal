@@ -1,0 +1,17 @@
+{
+  "last_fetch": "2026-05-29T11:42:04.075778",
+  "query": {
+    "sections": [
+      {
+        "label": "Default",
+        "keywords": [
+          "quantum",
+          "cryo",
+          "NV-centers"
+        ],
+        "mode": "majority",
+        "max_results": 20
+      }
+    ]
+  }
+}
