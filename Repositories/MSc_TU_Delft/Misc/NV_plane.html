@@ -7,28 +7,75 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <style>
-        body {
+        html, body {
             margin: 0;
+            height: 100%;
             font-family: Arial, sans-serif;
             overflow: hidden;
         }
         #canvas-container {
-            width: 100vw;
-            height: 100vh;
+            position: fixed;
+            inset: 0;
         }
-        #info {
-            position: absolute;
+        #canvas-container canvas {
+            display: block;
+        }
+
+        /* --- panel columns -------------------------------------------------
+           Both columns are flex stacks pinned to the viewport edges. They
+           scroll internally instead of overflowing, and the wrapper itself is
+           click-through so gaps never steal OrbitControls drags.            */
+        .panel-column {
+            position: fixed;
             top: 10px;
+            bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .panel-column > * {
+            pointer-events: auto;
+            flex: 0 0 auto;
+        }
+        #left-column {
             left: 10px;
+            width: clamp(200px, 26vw, 350px);
+            align-items: stretch;
+        }
+        #right-column {
+            right: 10px;
+            width: clamp(210px, 40vw, 600px);
+            align-items: stretch;
+        }
+        .panel {
             background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
+            padding: 12px;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            max-width: 350px;
+            box-sizing: border-box;
         }
+        .panel > summary {
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            list-style-position: inside;
+        }
+        .panel > summary + * {
+            margin-top: 8px;
+        }
+        .panel h3 {
+            margin: 0 0 8px;
+            font-size: 15px;
+        }
+
         .vector-info {
             margin: 5px 0;
-            font-size: 14px;
+            font-size: clamp(11px, 1.1vw, 14px);
+            word-break: break-word;
         }
         .vector-a { color: #ff0000; }
         .vector-b { color: #00ff00; }
@@ -37,43 +84,51 @@
         .vector-b-field { color: #ff8800; font-weight: bold; }
         .dot-products {
             margin-top: 10px;
-            padding: 10px;
+            padding: 8px;
             background: rgba(240, 240, 240, 0.8);
             border-radius: 3px;
         }
         .dot-product {
             margin: 5px 0;
-            font-size: 13px;
-        }
-        .controls {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-	#esr-container {
-    		position: absolute;
-    		bottom: 10px;
-    		right: 10px;
-    		background: rgba(255, 255, 255, 0.95);
-    		padding: 15px;
-    		border-radius: 5px;
-    		box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-		}
-        input[type="range"] {
-            width: 150px;
-            margin: 5px 0;
+            font-size: clamp(11px, 1vw, 13px);
         }
         .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin: 10px 0;
         }
-        label {
-            display: inline-block;
-            width: 80px;
-            font-size: 14px;
+        .control-group label {
+            flex: 0 0 auto;
+            min-width: 72px;
+            font-size: clamp(11px, 1vw, 14px);
+        }
+        .control-group input[type="range"] {
+            flex: 1 1 60px;
+            min-width: 60px;
+            width: auto;
+            margin: 0;
+        }
+        .control-group span {
+            flex: 0 0 auto;
+            font-size: clamp(11px, 1vw, 14px);
+            min-width: 42px;
+            text-align: right;
+        }
+        #highlight-controls table {
+            width: 100%;
+            font-size: clamp(11px, 1vw, 13px);
+        }
+        #dip-distances {
+            font-size: clamp(11px, 1vw, 13px);
+        }
+        /* Responsive plot: the SVG keeps its 600x300 aspect via viewBox and
+           simply scales with the column width.                              */
+        #esr-container svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 40vh;
         }
         hr {
             margin: 10px 0;
@@ -81,16 +136,48 @@
             border-top: 1px solid #ddd;
         }
         .angle-info {
-            font-size: 12px;
+            font-size: 0.9em;
             color: #666;
-            margin-left: 10px;
+            margin-left: 6px;
+        }
+        #ui-toggle {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 20;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        body.panels-hidden .panel-column {
+            display: none;
+        }
+
+        /* Narrow/short windows: tighten everything and let the columns share
+           the width instead of covering the scene.                          */
+        @media (max-width: 760px) {
+            #left-column  { width: 45vw; }
+            #right-column { width: 48vw; }
+            .panel { padding: 8px; }
+        }
+        @media (max-height: 520px) {
+            .panel { padding: 8px; }
+            #esr-container svg { max-height: 45vh; }
         }
     </style>
 </head>
 <body>
     <div id="canvas-container"></div>
-    <div id="info">
-        <h3>NV Center Orientations</h3>
+    <button id="ui-toggle" type="button">Hide panels</button>
+
+    <div id="left-column" class="panel-column">
+    <details id="info" class="panel" open>
+        <summary>NV Center Orientations</summary>
         <div class="vector-info vector-a">u_a = [-0.577, -0.577, -0.577]</div>
         <div class="vector-info vector-b">u_b = [0.577, 0.577, -0.577]</div>
         <div class="vector-info vector-c">u_c = [-0.577, 0.577, 0.577]</div>
@@ -106,10 +193,12 @@
         </div>
         <br>
         <small>Drag to rotate, scroll to zoom</small>
+    </details>
     </div>
-    
-    <div class="controls">
-        <h3>Magnetic Field Control</h3>
+
+    <div id="right-column" class="panel-column">
+    <details class="controls panel" open>
+        <summary>Magnetic Field Control</summary>
         <div class="control-group">
             <label>Theta (θ):</label>
             <input type="range" id="theta" min="0" max="180" value="35" step="1">
@@ -131,13 +220,11 @@
             <input type="range" id="b-strength" min="0" max="100" value="7" step="1">
             <span id="b-strength-value">7 mT</span>
         </div>
-    </div>
+    </details>
 
     <!-- Add this just below your controls -->
-    <div id="highlight-controls" style="position:absolute;top:250px;right:10px;
-          background:rgba(255,255,255,0.95);padding:10px;border-radius:5px;
-          box-shadow:0 2px 5px rgba(0,0,0,0.2);font-size:13px;">
-      <b>Highlight regions</b><br>
+    <details id="highlight-controls" class="panel" open>
+      <summary>Highlight regions</summary>
       <table>
          <tr><td>uₐ</td>
           <td><input type="checkbox" id="ua-pos"> +</td>
@@ -152,10 +239,19 @@
           <td><input type="checkbox" id="ud-pos"> +</td>
           <td><input type="checkbox" id="ud-neg"> −</td></tr>
       </table>
-    </div>
+    </details>
 
-    <div id="esr-container">
-        <svg width="600" height="300" xmlns="http://www.w3.org/2000/svg" id="esr-svg">
+    <details id="dip-distances" class="panel" open>
+        <summary>Dip Spacings</summary>
+        <div id="distance-a" style="color:#ff0000;">NV-a: -- MHz</div>
+        <div id="distance-b" style="color:#00ff00;">NV-b: -- MHz</div>
+        <div id="distance-c" style="color:#0000ff;">NV-c: -- MHz</div>
+        <div id="distance-d" style="color:#ff00ff;">NV-d: -- MHz</div>
+    </details>
+
+    <details id="esr-container" class="panel" open>
+        <summary>ESR Spectrum</summary>
+        <svg viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" id="esr-svg">
             <!-- Background -->
             <rect width="600" height="300" fill="white"/>
             
@@ -173,9 +269,11 @@
             <line x1="300" y1="0" x2="300" y2="300" stroke="gray" stroke-width="2" stroke-dasharray="5,5"/>
             <text x="305" y="20" font-family="Arial" font-size="12" fill="gray">ZFS (2.87 GHz)</text>
             
-            <!-- ESR signal will be dynamically generated -->
-            <path id="esr-signal" stroke="blue" stroke-width="2" fill="none"/>
-            
+            <!-- Flat baseline; colored dip curves are drawn on top of this -->
+            <line id="esr-baseline" x1="20" y1="150" x2="580" y2="150" stroke="#999" stroke-width="1.5"/>
+            <!-- Per-NV colored dip curves, generated dynamically -->
+            <g id="esr-dips"></g>
+
             <!-- Axes -->
             <g stroke="black" stroke-width="2">
                 <line x1="20" y1="280" x2="580" y2="280"/>
@@ -193,9 +291,6 @@
             <text x="400" y="295" text-anchor="middle" font-family="Arial" font-size="11">3.0</text>
             <text x="500" y="295" text-anchor="middle" font-family="Arial" font-size="11">3.1</text>
             
-            <!-- Title -->
-            <text x="300" y="30" text-anchor="middle" font-family="Arial" font-size="16" font-weight="bold">ESR Spectrum</text>
-            
             <!-- Legend -->
             <g id="esr-legend" font-family="Arial" font-size="11">
                 <rect x="450" y="50" width="15" height="3" fill="#ff0000"/>
@@ -208,26 +303,9 @@
                 <text x="470" y="85">NV-d</text>
             </g>
         </svg>
+    </details>
     </div>
 
-    <div id="dip-distances" style="
-    	position: absolute;
-    	bottom: 330px;
-    	right: 10px;
-    	background: rgba(255,255,255,0.95);
-    	padding: 10px;
-    	border-radius: 5px;
-    	box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-   	font-family: Arial, sans-serif;
-    	font-size: 13px;
-    	max-width: 200px;
-	">
-    	<strong>Dip Spacings:</strong>
-    	<div id="distance-a" style="color:#ff0000;">NV-a: -- MHz</div>
-    	<div id="distance-b" style="color:#00ff00;">NV-b: -- MHz</div>
-    	<div id="distance-c" style="color:#0000ff;">NV-c: -- MHz</div>
-    	<div id="distance-d" style="color:#ff00ff;">NV-d: -- MHz</div>
-    </div>
     <script>
         // Scene setup
         const scene = new THREE.Scene();
@@ -244,10 +322,12 @@
         camera.lookAt(0, 0, 0);
 
 
-        // Renderer setup
+        // Renderer setup — sized from its container so it tracks any layout change
+        const canvasContainer = document.getElementById('canvas-container');
         const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        canvasContainer.appendChild(renderer.domElement);
 
         // Controls
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -427,26 +507,25 @@
     		}
 	    });
 
-            // Generate ESR path
-            let pathData = 'M 20,150 ';
             const baseY = 150;
             const width = 560;
             const freqRange = 0.6; // GHz range shown (2.6 to 3.2 GHz)
             const centerX = 300; // ZFS position
-            
+            const left = 20, right = 580;
+
             // Create dips for each NV orientation
             const dipWidth = 15;
             const dipPositions = [];
-            
+
             nvVectors.forEach((vec, idx) => {
                 const shift = freqShifts[idx];
                 // Two dips per NV (ms = +1 and ms = -1)
                 const leftDip = centerX - (shift / freqRange) * width;
                 const rightDip = centerX + (shift / freqRange) * width;
-                
+
                 // Dip depth proportional to dot product
                 const depth = 50 + Math.abs(dotProducts[idx]) * 80; // 50 to 130 pixels
-                
+
                 dipPositions.push({
                     left: leftDip,
                     right: rightDip,
@@ -454,66 +533,50 @@
                     color: vec.color
                 });
             });
-            
-            // Sort dips by position for smooth curve
-            const allDips = [];
-            dipPositions.forEach((dip, idx) => {
-                allDips.push({ x: dip.left, depth: dip.depth, idx: idx });
-                allDips.push({ x: dip.right, depth: dip.depth, idx: idx });
-            });
-            allDips.sort((a, b) => a.x - b.x);
-            
-            // Generate smooth curve through dips
-            let x = 20;
-            for (let i = 0; i < allDips.length; i++) {
-                const dip = allDips[i];
-                const dipX = Math.max(20, Math.min(580, dip.x));
-                
-                if (dipX > x + 5) {
-                    pathData += `L ${dipX - dipWidth},${baseY} `;
-                    pathData += `C ${dipX - dipWidth/2},${baseY} ${dipX - dipWidth/2},${baseY + dip.depth/2} ${dipX},${baseY + dip.depth} `;
-                    pathData += `C ${dipX + dipWidth/2},${baseY + dip.depth/2} ${dipX + dipWidth/2},${baseY} ${dipX + dipWidth},${baseY} `;
-                    x = dipX + dipWidth;
-                }
+
+            // Draw each dip as its own colored curve (baseline -> trough -> baseline)
+            // so the whole dip — not just its tip — carries the NV's color.
+            // Overlapping dips are drawn with partial opacity so overlaps blend
+            // instead of one color fully hiding another.
+            const dipsGroup = document.getElementById('esr-dips');
+            dipsGroup.innerHTML = '';
+
+            function dipPathD(centerXPos, depth) {
+                const x = Math.max(left, Math.min(right, centerXPos));
+                return `M ${x - dipWidth},${baseY} ` +
+                    `C ${x - dipWidth/2},${baseY} ${x - dipWidth/2},${baseY + depth/2} ${x},${baseY + depth} ` +
+                    `C ${x + dipWidth/2},${baseY + depth/2} ${x + dipWidth/2},${baseY} ${x + dipWidth},${baseY}`;
             }
-            pathData += `L 580,${baseY}`;
-            
-            // Update the path
-            document.getElementById('esr-signal').setAttribute('d', pathData);
-            
-            // Add colored markers for each dip
-            const markers = document.getElementById('esr-markers') || createMarkerGroup();
-            markers.innerHTML = '';
-            
-            dipPositions.forEach((dip, idx) => {
-                // Left dip marker
-                if (dip.left > 20 && dip.left < 580) {
-                    const leftMarker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    leftMarker.setAttribute('cx', dip.left);
-                    leftMarker.setAttribute('cy', baseY + dip.depth);
-                    leftMarker.setAttribute('r', '3');
-                    leftMarker.setAttribute('fill', `#${dip.color.toString(16).padStart(6, '0')}`);
-                    markers.appendChild(leftMarker);
-                }
-                
-                // Right dip marker
-                if (dip.right > 20 && dip.right < 580) {
-                    const rightMarker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    rightMarker.setAttribute('cx', dip.right);
-                    rightMarker.setAttribute('cy', baseY + dip.depth);
-                    rightMarker.setAttribute('r', '3');
-                    rightMarker.setAttribute('fill', `#${dip.color.toString(16).padStart(6, '0')}`);
-                    markers.appendChild(rightMarker);
-                }
+
+            function addDipCurve(centerXPos, depth, colorHex) {
+                if (centerXPos < left || centerXPos > right) return;
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', dipPathD(centerXPos, depth));
+                path.setAttribute('stroke', colorHex);
+                path.setAttribute('stroke-width', '2.5');
+                path.setAttribute('stroke-opacity', '0.85');
+                path.setAttribute('fill', 'none');
+                dipsGroup.appendChild(path);
+            }
+
+            dipPositions.forEach(dip => {
+                const colorHex = `#${dip.color.toString(16).padStart(6, '0')}`;
+                addDipCurve(dip.left, dip.depth, colorHex);
+                addDipCurve(dip.right, dip.depth, colorHex);
             });
-        }
-        
-        function createMarkerGroup() {
-            const svg = document.getElementById('esr-svg');
-            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            group.setAttribute('id', 'esr-markers');
-            svg.appendChild(group);
-            return group;
+
+            // Colored markers at each dip's trough for precise readout
+            dipPositions.forEach(dip => {
+                [dip.left, dip.right].forEach(x => {
+                    if (x <= left || x >= right) return;
+                    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    marker.setAttribute('cx', x);
+                    marker.setAttribute('cy', baseY + dip.depth);
+                    marker.setAttribute('r', '3');
+                    marker.setAttribute('fill', `#${dip.color.toString(16).padStart(6, '0')}`);
+                    dipsGroup.appendChild(marker);
+                });
+            });
         }
 
         // Function to update dot products display
@@ -690,11 +753,27 @@
             renderer.render(scene, camera);
         }
 
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
+        // Handle window resize (ResizeObserver also catches devtools/zoom changes)
+        function onResize() {
+            const w = canvasContainer.clientWidth;
+            const h = canvasContainer.clientHeight;
+            if (!w || !h) return;
+            camera.aspect = w / h;
             camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(w, h);
+        }
+        window.addEventListener('resize', onResize);
+        if (window.ResizeObserver) {
+            new ResizeObserver(onResize).observe(canvasContainer);
+        }
+        onResize();
+
+        // Toggle all overlay panels — useful when the window is very small
+        const uiToggle = document.getElementById('ui-toggle');
+        uiToggle.addEventListener('click', () => {
+            const hidden = document.body.classList.toggle('panels-hidden');
+            uiToggle.textContent = hidden ? 'Show panels' : 'Hide panels';
         });
 
         // Start animation

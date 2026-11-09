@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Superconductor Periodic Table</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --surface-2:      #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --border:         rgba(11,11,11,0.10);
+
+    --blue:    #2a78d6;   /* selected */
+    --blue-bg: #cde2fb;
+    --orange:    #eb6834; /* related (co-occurring) */
+    --orange-bg: #fbdccb;
+    --aqua:    #1baf7a;   /* ambient elemental superconductor */
+    --aqua-bg: #c9f0e1;
+    --yellow:    #eda100; /* high-pressure-only elemental superconductor */
+    --yellow-bg: #fbe6bf;
+    --compound-bg: #e7e6f5; /* compound-only element, no ambient elemental data */
+
+    --status-good:     #0ca30c;
+    --status-warning:  #fab219;
+    --status-serious:  #ec835a;
+    --status-critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --surface-2:      #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --border:         rgba(255,255,255,0.10);
+
+      --blue:    #3987e5;
+      --blue-bg: #184f95;
+      --orange:    #d95926;
+      --orange-bg: #7a3313;
+      --aqua:    #199e70;
+      --aqua-bg: #0e4a35;
+      --yellow:    #c98500;
+      --yellow-bg: #5c3d00;
+      --compound-bg: #2c2a45;
+
+      --status-good:     #0ca30c;
+      --status-warning:  #fab219;
+      --status-serious:  #ec835a;
+      --status-critical: #d03b3b;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--surface-2);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  body { padding: 20px 20px 48px; }
+
+  h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 14px; max-width: 900px; }
+
+  details.about {
+    max-width: 900px; margin: 0 0 18px; font-size: 0.83rem; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;
+  }
+  details.about summary { cursor: pointer; font-weight: 600; color: var(--text-primary); }
+  details.about p { margin: 8px 0 0; line-height: 1.5; }
+
+  .layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+
+  .table-scroll { overflow-x: auto; padding-bottom: 8px; }
+  .ptable {
+    display: grid;
+    grid-template-columns: repeat(18, 44px);
+    grid-template-rows: repeat(10, 44px);
+    gap: 3px;
+    width: max-content;
+  }
+  .cell {
+    grid-column: var(--c); grid-row: var(--r);
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: default;
+    position: relative;
+    padding: 2px;
+    transition: opacity 120ms ease, transform 80ms ease, background-color 120ms ease;
+  }
+  .cell .num { font-size: 0.5rem; color: var(--text-muted); position: absolute; top: 2px; left: 3px; }
+  .cell .sym { font-size: 0.92rem; font-weight: 700; line-height: 1; }
+  .cell.clickable { cursor: pointer; }
+  .cell.clickable:hover { transform: scale(1.08); z-index: 5; box-shadow: 0 2px 8px var(--border); }
+
+  .cell.state-ambient   { background: var(--aqua-bg); }
+  .cell.state-highp     { background: var(--yellow-bg); }
+  .cell.state-compound  { background: var(--compound-bg); }
+  .cell.state-none      { opacity: 0.45; }
+
+  .cell.sel-selected { background: var(--blue); border-color: var(--blue); }
+  .cell.sel-selected .sym, .cell.sel-selected .num { color: #fff; }
+  .cell.sel-related  { background: var(--orange-bg); border-color: var(--orange); border-width: 2px; }
+  .cell.sel-faded     { opacity: 0.25; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 12px 0 0; font-size: 0.78rem; color: var(--text-secondary); max-width: 820px; }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border); flex: none; }
+
+  .panel {
+    flex: 1 1 340px; min-width: 320px; max-width: 480px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; font-size: 0.87rem; line-height: 1.5;
+  }
+  .panel h2 { margin: 0 0 2px; font-size: 1.15rem; }
+  .panel .el-name { color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 12px; }
+  .panel .empty { color: var(--text-muted); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+    color: #fff; margin: 0 6px 6px 0;
+  }
+  .badge.good     { background: var(--status-good); }
+  .badge.warning  { background: var(--status-warning); color: #1a1a19; }
+  .badge.serious  { background: var(--status-serious); }
+  .badge.critical { background: var(--status-critical); }
+  .badge.info     { background: var(--text-muted); }
+
+  .section-title { font-weight: 700; margin: 16px 0 6px; font-size: 0.85rem; }
+  .compound {
+    border-top: 1px solid var(--gridline); padding: 8px 0;
+  }
+  .compound:first-child { border-top: none; }
+  .compound .name { font-weight: 700; }
+  .compound .meta { color: var(--text-secondary); font-size: 0.8rem; }
+  .compound .notes { font-size: 0.8rem; margin-top: 3px; }
+  .compound .ref { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .chip {
+    font-size: 0.75rem; padding: 1px 7px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--border); cursor: pointer;
+  }
+  .chip:hover { border-color: var(--blue); color: var(--blue); }
+  .clear-btn {
+    font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-primary); cursor: pointer; margin-top: 4px;
+  }
+  .clear-btn:hover { border-color: var(--blue); }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 50;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 0.75rem; padding: 5px 9px; border-radius: 6px;
+    max-width: 220px; line-height: 1.4; display: none;
+  }
+</style>
+</head>
+<body>
+<div class="viz-root">
+
+  <h1>Superconductor Periodic Table</h1>
+  <p class="subtitle">Click an element to see which other elements it has been combined with in known superconductors, plus its own superconducting properties if any.</p>
+
+  <details class="about">
+    <summary>About this dataset</summary>
+    <p><strong>Scope:</strong> <span id="about-scope"></span></p>
+    <p><strong>Disputed / retracted claims policy:</strong> <span id="about-disputed"></span></p>
+    <p><strong>Compiled:</strong> <span id="about-compiled"></span></p>
+  </details>
+
+  <div class="layout">
+    <div>
+      <div class="table-scroll">
+        <div class="ptable" id="ptable"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="panel" id="panel"></div>
+  </div>
+
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = {"meta": {"description": "Curated dataset of known superconducting elements and compounds, for use in an interactive periodic-table visualization.", "scope_note": "This is a representative, cited subset (42 elements, 68 compounds as of the latest pass) covering all major conventional AND unconventional superconductor families - including elemental, A15, NbTi-alloy, MgB2-type, Chevrel phase, cuprate (hole- and electron-doped), iron-based, heavy fermion (including actinide), organic/molecular, fullerene, hydride, borocarbide, ruthenate, kagome-metal, TMD/dichalcogenide, moire/2D, and BiS2-based families. IT IS NOT, AND CANNOT PRACTICALLY BE, AN EXHAUSTIVE LIST: the standard reference database for this field, NIMS SuperCon (https://supercon.nims.go.jp), contains 30,000+ entries, because continuous doping series (e.g. every reported x in La2-xSrxCuO4), synthesis-condition variants, and new weekly literature reports each generate additional entries in a way a hand-curated file cannot track exhaustively. Treat this file as broad, cited coverage of the field's major families and landmark/record materials - not a claim of completeness. For true exhaustiveness, query NIMS SuperCon directly or the review Buzea & Robbins, 'Assessment of the elemental superconductors,' Supercond. Sci. Technol. 18, R1 (2005).", "compiled": "2026-09", "disputed_claims_policy": "Extraordinary/retracted claims (esp. room-temperature superconductivity claims) are included but explicitly flagged in 'notes' as disputed/retracted/unconfirmed rather than omitted or presented as settled fact, given this subfield's documented history of retractions (e.g. R. Dias group, 5 retractions 2022-2024) and unreplicated claims (e.g. LK-99, 2023)."}, "elements": {"Al": {"elemental_sc": true, "tc_ambient_K": 1.175, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins, Supercond. Sci. Technol. 18, R1 (2005)"}, "Be": {"elemental_sc": true, "tc_ambient_K": 0.026, "tc_highP_K": null, "pressure_GPa": null, "notes": "Only superconducts as thin film; bulk crystalline Be does not superconduct above ~1 mK", "ref": "Buzea & Robbins (2005)"}, "Cd": {"elemental_sc": true, "tc_ambient_K": 0.517, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Ga": {"elemental_sc": true, "tc_ambient_K": 1.083, "tc_highP_K": null, "pressure_GPa": null, "notes": "Metastable beta-Ga phase reaches ~6 K", "ref": "Buzea & Robbins (2005)"}, "Hf": {"elemental_sc": true, "tc_ambient_K": 0.128, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Hg": {"elemental_sc": true, "tc_ambient_K": 4.15, "tc_highP_K": null, "pressure_GPa": null, "notes": "First superconductor ever discovered (Onnes, 1911), alpha phase", "ref": "Onnes, Comm. Phys. Lab. Univ. Leiden (1911)"}, "In": {"elemental_sc": true, "tc_ambient_K": 3.41, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Ir": {"elemental_sc": true, "tc_ambient_K": 0.14, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "La": {"elemental_sc": true, "tc_ambient_K": 6.0, "tc_highP_K": 13.0, "pressure_GPa": 15, "notes": "beta (fcc) phase 6.0 K; alpha (hcp) phase 4.9 K; Tc rises further under pressure", "ref": "Buzea & Robbins (2005)"}, "Mo": {"elemental_sc": true, "tc_ambient_K": 0.92, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Nb": {"elemental_sc": true, "tc_ambient_K": 9.25, "tc_highP_K": null, "pressure_GPa": null, "notes": "Highest Tc of any element at ambient pressure", "ref": "Buzea & Robbins (2005)"}, "Os": {"elemental_sc": true, "tc_ambient_K": 0.66, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Pa": {"elemental_sc": true, "tc_ambient_K": 1.4, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Pb": {"elemental_sc": true, "tc_ambient_K": 7.19, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Re": {"elemental_sc": true, "tc_ambient_K": 1.7, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Ru": {"elemental_sc": true, "tc_ambient_K": 0.49, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Sn": {"elemental_sc": true, "tc_ambient_K": 3.72, "tc_highP_K": null, "pressure_GPa": null, "notes": "White (beta) tin", "ref": "Buzea & Robbins (2005)"}, "Ta": {"elemental_sc": true, "tc_ambient_K": 4.47, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Tc": {"elemental_sc": true, "tc_ambient_K": 7.8, "tc_highP_K": null, "pressure_GPa": null, "notes": "Technetium", "ref": "Buzea & Robbins (2005)"}, "Th": {"elemental_sc": true, "tc_ambient_K": 1.38, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Ti": {"elemental_sc": true, "tc_ambient_K": 0.39, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Tl": {"elemental_sc": true, "tc_ambient_K": 2.38, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "U": {"elemental_sc": true, "tc_ambient_K": 0.2, "tc_highP_K": 2.3, "pressure_GPa": 12, "notes": "Multiple allotropic phases complicate exact ambient value; rises under pressure", "ref": "Buzea & Robbins (2005)"}, "V": {"elemental_sc": true, "tc_ambient_K": 5.38, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "W": {"elemental_sc": true, "tc_ambient_K": 0.015, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Zn": {"elemental_sc": true, "tc_ambient_K": 0.85, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Zr": {"elemental_sc": true, "tc_ambient_K": 0.61, "tc_highP_K": null, "pressure_GPa": null, "notes": "", "ref": "Buzea & Robbins (2005)"}, "Am": {"elemental_sc": true, "tc_ambient_K": 0.79, "tc_highP_K": 1.0, "pressure_GPa": 0.8, "notes": "alpha phase 0.79 K; beta phase under slight pressure ~1.0 K", "ref": "Buzea & Robbins (2005)"}, "Rh": {"elemental_sc": true, "tc_ambient_K": 0.000325, "tc_highP_K": null, "pressure_GPa": null, "notes": "Lowest confirmed Tc of any elemental superconductor", "ref": "MDPI Nanomaterials 14, 1740 (2024), review"}, "Li": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 20, "pressure_GPa": 48, "notes": "Highest Tc of any alkali metal; requires ~30 GPa onset, ~48 GPa (480 kbar) for 20 K; Tc vs P is strongly non-monotonic", "ref": "Shimizu et al., Nature 419, 597 (2002)"}, "Ca": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 29, "pressure_GPa": 216, "notes": "Highest confirmed Tc of any elemental superconductor", "ref": "Crystal Chemistry at High Pressure review, arXiv:2301.01139"}, "Sc": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 36, "pressure_GPa": 283, "notes": "Approximate; see source for precise P-dependence", "ref": "'Superconductivity above 30 K achieved in dense scandium', arXiv:2303.01062"}, "Y": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 19.5, "pressure_GPa": 115, "notes": "Approximate", "ref": "Hamlin et al., Physica C (2006)"}, "Fe": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 2, "pressure_GPa": 20, "notes": "Non-magnetic hcp (epsilon) phase only", "ref": "Shimizu et al., Nature 412, 316 (2001)"}, "S": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 17, "pressure_GPa": 160, "notes": "", "ref": "Struzhkin et al., Nature 390, 382 (1997)"}, "O": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 0.6, "pressure_GPa": 100, "notes": "Weak, only metallic phase near this pressure", "ref": "Shimizu et al., Nature 393, 767 (1998)"}, "P": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 10, "pressure_GPa": 30, "notes": "Approximate", "ref": "Wittig, Z. Physik (1966); later refinements"}, "Si": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 8.2, "pressure_GPa": 15, "notes": "Si-II (beta-tin) structure; one of the earliest pressure-induced elemental superconductors found", "ref": "Buzea & Robbins (2005)"}, "Ge": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 5.4, "pressure_GPa": 12, "notes": "", "ref": "Buzea & Robbins (2005)"}, "B": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 11, "pressure_GPa": 250, "notes": "Approximate", "ref": "Eremets et al., Science 293, 272 (2001)"}, "Bi": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 8.5, "pressure_GPa": 5, "notes": "Several high-pressure polymorphs (Bi-II, III, V); value approximate", "ref": "Buzea & Robbins (2005)"}, "Ba": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 5, "pressure_GPa": 18, "notes": "Approximate, several phases", "ref": "Buzea & Robbins (2005)"}, "Cr": {"elemental_sc": true, "tc_ambient_K": null, "tc_highP_K": null, "pressure_GPa": null, "notes": "WEAKER SOURCING than other entries in this file. Bulk Cr does NOT superconduct - it hosts a competing antiferromagnetic spin-density-wave order instead (T_N ~ 311 K). One review source (Preprints.org, 2025) lists Cr as superconducting only in thin-film form at ambient pressure, without giving a specific Tc; this claim is less well-corroborated than the rest of this dataset. Cr's superconductivity is much better established in COMPOUND form - see CrAs and CrH/CrH3 in the compounds list.", "ref": "Preprints.org 202507.2475 (2025), citing the 'Periodic Table of Superconductivity'"}, "I": {"elemental_sc": false, "tc_ambient_K": null, "tc_highP_K": 1.2, "pressure_GPa": 28, "notes": "Molecular I2 dissociates into a monatomic metal under pressure and superconducts; value is an upper bound (Tc < 1.2 K), studied up to 74 GPa", "ref": "J. Supercond. Nov. Magn., 'The pressure-induced superconductivity of iodine'; cited in Buzea & Robbins (2005)"}}, "compounds": [{"name": "Nb3Sn", "common_name": null, "family": "A15", "elements": ["Nb", "Sn"], "tc_K": 18.3, "pressure": "ambient", "discovery_year": 1954, "notes": "Workhorse magnet wire material (MRI, accelerator magnets)", "ref": "Matthias et al., Phys. Rev. 95, 1435 (1954)"}, {"name": "Nb3Ge", "common_name": null, "family": "A15", "elements": ["Nb", "Ge"], "tc_K": 23.2, "pressure": "ambient", "discovery_year": 1973, "notes": "Held the overall Tc record 1973-1986, until cuprates", "ref": "Gavaler, Appl. Phys. Lett. 23, 480 (1973)"}, {"name": "V3Si", "common_name": null, "family": "A15", "elements": ["V", "Si"], "tc_K": 17.1, "pressure": "ambient", "discovery_year": 1953, "notes": "First A15 superconductor discovered", "ref": "Hardy & Hulm, Phys. Rev. 89, 884 (1953)"}, {"name": "Nb3Al", "common_name": null, "family": "A15", "elements": ["Nb", "Al"], "tc_K": 18.7, "pressure": "ambient", "discovery_year": 1958, "notes": "", "ref": "Buzea & Robbins (2005)"}, {"name": "NbTi", "common_name": null, "family": "NbTi-alloy", "elements": ["Nb", "Ti"], "tc_K": 9.6, "pressure": "ambient", "discovery_year": 1962, "notes": "Most widely used commercial superconducting wire (ductile, easily processed)", "ref": "Buzea & Robbins (2005)"}, {"name": "NbTi (pressurized)", "common_name": null, "family": "NbTi-alloy", "elements": ["Nb", "Ti"], "tc_K": 19.1, "pressure": "261.7 GPa", "discovery_year": 2018, "notes": "Record Tc and Hc2 among transition-metal-only alloy superconductors under pressure", "ref": "arXiv:1808.07215"}, {"name": "MgB2", "common_name": null, "family": "MgB2-type", "elements": ["Mg", "B"], "tc_K": 39, "pressure": "ambient", "discovery_year": 2001, "notes": "Highest-Tc simple binary phonon-mediated (BCS) superconductor at ambient pressure", "ref": "Nagamatsu et al., Nature 410, 63 (2001)"}, {"name": "PbMo6S8", "common_name": "Chevrel phase", "family": "Chevrel phase", "elements": ["Pb", "Mo", "S"], "tc_K": 15, "pressure": "ambient", "discovery_year": 1971, "notes": "Extremely high upper critical field despite modest Tc", "ref": "Chevrel et al., J. Solid State Chem. 3, 515 (1971)"}, {"name": "SnMo6S8", "common_name": "Chevrel phase", "family": "Chevrel phase", "elements": ["Sn", "Mo", "S"], "tc_K": 14, "pressure": "ambient", "discovery_year": 1971, "notes": "", "ref": "Chevrel et al. (1971)"}, {"name": "La2-xBaxCuO4", "common_name": "LBCO", "family": "Cuprate", "elements": ["La", "Ba", "Cu", "O"], "tc_K": 35, "pressure": "ambient", "discovery_year": 1986, "notes": "First high-Tc cuprate; launched the field", "ref": "Bednorz & Muller, Z. Phys. B 64, 189 (1986)"}, {"name": "YBa2Cu3O7-d", "common_name": "YBCO", "family": "Cuprate", "elements": ["Y", "Ba", "Cu", "O"], "tc_K": 92, "pressure": "ambient", "discovery_year": 1987, "notes": "First superconductor above liquid-nitrogen temperature (77 K)", "ref": "Wu et al., Phys. Rev. Lett. 58, 908 (1987)"}, {"name": "Bi2Sr2CaCu2O8+d", "common_name": "BSCCO-2212", "family": "Cuprate", "elements": ["Bi", "Sr", "Ca", "Cu", "O"], "tc_K": 95, "pressure": "ambient", "discovery_year": 1988, "notes": "", "ref": "Maeda et al., Jpn. J. Appl. Phys. 27, L209 (1988)"}, {"name": "Tl2Ba2Ca2Cu3O10", "common_name": "Tl-2223", "family": "Cuprate", "elements": ["Tl", "Ba", "Ca", "Cu", "O"], "tc_K": 125, "pressure": "ambient", "discovery_year": 1988, "notes": "", "ref": "Sheng & Hermann, Nature 332, 138 (1988)"}, {"name": "HgBa2Ca2Cu3O8+d", "common_name": "Hg-1223", "family": "Cuprate", "elements": ["Hg", "Ba", "Ca", "Cu", "O"], "tc_K": 133, "pressure": "ambient", "discovery_year": 1993, "notes": "Highest ambient-pressure Tc from 1993 until 2026", "ref": "Schilling et al., Nature 363, 56 (1993)"}, {"name": "HgBa2Ca2Cu3O8+d (pressurized)", "common_name": "Hg-1223", "family": "Cuprate", "elements": ["Hg", "Ba", "Ca", "Cu", "O"], "tc_K": 164, "pressure": "~30 GPa", "discovery_year": 1994, "notes": "Highest confirmed Tc of any cuprate under pressure", "ref": "Gao et al., Phys. Rev. B 50, 4260 (1994)"}, {"name": "HgBa2Ca2Cu3O8+d (pressure-quenched)", "common_name": "Hg-1223", "family": "Cuprate", "elements": ["Hg", "Ba", "Ca", "Cu", "O"], "tc_K": 151, "pressure": "ambient (metastable, via pressure-quench)", "discovery_year": 2026, "notes": "New ambient-pressure record as of March 2026; metastable high-pressure phase preserved via rapid pressure-release protocol; very recent, single-group result", "ref": "Deng et al., PNAS (2026), arXiv:2603.12437"}, {"name": "LaFeAsO1-xFx", "common_name": "LaFeAsO(F)", "family": "Iron-based (pnictide/chalcogenide)", "elements": ["La", "Fe", "As", "O", "F"], "tc_K": 26, "pressure": "ambient", "discovery_year": 2008, "notes": "First iron-based (pnictide) superconductor discovered", "ref": "Kamihara et al., J. Am. Chem. Soc. 130, 3296 (2008)"}, {"name": "SmFeAsO1-xFx", "common_name": null, "family": "Iron-based (pnictide/chalcogenide)", "elements": ["Sm", "Fe", "As", "O", "F"], "tc_K": 55, "pressure": "ambient", "discovery_year": 2008, "notes": "Highest Tc of the 1111-family iron pnictides", "ref": "Ren et al., Chin. Phys. Lett. 25, 2215 (2008)"}, {"name": "Ba1-xKxFe2As2", "common_name": "122-family", "family": "Iron-based (pnictide/chalcogenide)", "elements": ["Ba", "K", "Fe", "As"], "tc_K": 38, "pressure": "ambient", "discovery_year": 2008, "notes": "", "ref": "Rotter et al., Phys. Rev. Lett. 101, 107006 (2008)"}, {"name": "LiFeAs", "common_name": "111-family", "family": "Iron-based (pnictide/chalcogenide)", "elements": ["Li", "Fe", "As"], "tc_K": 18, "pressure": "ambient", "discovery_year": 2008, "notes": "Superconducts without chemical doping", "ref": "Wang et al., Solid State Commun. 148, 538 (2008)"}, {"name": "FeSe", "common_name": "11-family", "family": "Iron-based (pnictide/chalcogenide)", "elements": ["Fe", "Se"], "tc_K": 8, "pressure": "ambient", "discovery_year": 2008, "notes": "Simplest structure of the iron-based superconductors (bulk value)", "ref": "Hsu et al., PNAS 105, 14262 (2008)"}, {"name": "FeSe (monolayer)", "common_name": null, "family": "Iron-based (pnictide/chalcogenide)", "elements": ["Fe", "Se"], "tc_K": 65, "pressure": "ambient", "discovery_year": 2012, "notes": "Interface-enhanced monolayer on SrTiO3 substrate; not bulk; some reports claim higher (up to ~100 K), figure disputed/not fully settled", "ref": "Physics Today, 'Iron-based superconductors: Teenage, complex, challenging' (2025 review)"}, {"name": "ThFeAsN", "common_name": null, "family": "Iron-based (pnictide/chalcogenide)", "elements": ["Th", "Fe", "As", "N"], "tc_K": 30, "pressure": "ambient", "discovery_year": 2016, "notes": "Superconducts without doping or applied pressure, unusual for this family", "ref": "PMC5537253"}, {"name": "CeCu2Si2", "common_name": null, "family": "Heavy fermion", "elements": ["Ce", "Cu", "Si"], "tc_K": 0.6, "pressure": "ambient", "discovery_year": 1979, "notes": "First heavy-fermion superconductor discovered", "ref": "Steglich et al., Phys. Rev. Lett. 43, 1892 (1979)"}, {"name": "UBe13", "common_name": null, "family": "Heavy fermion", "elements": ["U", "Be"], "tc_K": 0.85, "pressure": "ambient", "discovery_year": 1983, "notes": "", "ref": "Ott et al., Phys. Rev. Lett. 50, 1595 (1983)"}, {"name": "UPt3", "common_name": null, "family": "Heavy fermion", "elements": ["U", "Pt"], "tc_K": 0.5, "pressure": "ambient", "discovery_year": 1984, "notes": "Multiple superconducting phases; likely unconventional/odd-parity pairing", "ref": "Stewart et al., Phys. Rev. Lett. 52, 679 (1984)"}, {"name": "CeCoIn5", "common_name": null, "family": "Heavy fermion", "elements": ["Ce", "Co", "In"], "tc_K": 2.3, "pressure": "ambient", "discovery_year": 2001, "notes": "One of the higher-Tc heavy fermion superconductors", "ref": "Petrovic et al., J. Phys.: Condens. Matter 13, L337 (2001)"}, {"name": "URu2Si2", "common_name": null, "family": "Heavy fermion", "elements": ["U", "Ru", "Si"], "tc_K": 1.5, "pressure": "ambient", "discovery_year": 1985, "notes": "Coexists with mysterious 'hidden order' phase transition at 17.5 K", "ref": "Buzea & Robbins (2005)"}, {"name": "(TMTSF)2PF6", "common_name": "Bechgaard salt", "family": "Organic/molecular", "elements": ["C", "H", "Se", "P", "F"], "tc_K": 1.1, "pressure": "~0.9 GPa (9 kbar)", "discovery_year": 1980, "notes": "First organic superconductor discovered", "ref": "Jerome et al., J. Phys. Lett. 41, L95 (1980)"}, {"name": "k-(BEDT-TTF)2Cu(NCS)2", "common_name": null, "family": "Organic/molecular", "elements": ["C", "H", "S", "N", "Cu"], "tc_K": 10.4, "pressure": "ambient", "discovery_year": 1988, "notes": "", "ref": "Urayama et al., Chem. Lett. 17, 55 (1988)"}, {"name": "k-(BEDT-TTF)2Cu[N(CN)2]Br", "common_name": null, "family": "Organic/molecular", "elements": ["C", "H", "S", "N", "Cu", "Br"], "tc_K": 11.6, "pressure": "ambient", "discovery_year": 1990, "notes": "One of the highest ambient-pressure Tc values among organic superconductors", "ref": "Kini et al., Inorg. Chem. 29, 2555 (1990)"}, {"name": "K3C60", "common_name": null, "family": "Fullerene-based", "elements": ["K", "C"], "tc_K": 19, "pressure": "ambient", "discovery_year": 1991, "notes": "First superconducting fulleride discovered", "ref": "Hebard et al., Nature 350, 600 (1991)"}, {"name": "Rb3C60", "common_name": null, "family": "Fullerene-based", "elements": ["Rb", "C"], "tc_K": 29, "pressure": "ambient", "discovery_year": 1991, "notes": "", "ref": "Rosseinsky et al., Phys. Rev. Lett. 66, 2830 (1991)"}, {"name": "RbCs2C60", "common_name": null, "family": "Fullerene-based", "elements": ["Rb", "Cs", "C"], "tc_K": 33, "pressure": "ambient", "discovery_year": 1993, "notes": "", "ref": "Tanigaki et al., Nature 352, 222 (1991)/(1993)"}, {"name": "Cs3C60 (A15 phase)", "common_name": null, "family": "Fullerene-based", "elements": ["Cs", "C"], "tc_K": 38.3, "pressure": "~0.7 GPa (7 kbar)", "discovery_year": 2008, "notes": "Highest confirmed Tc of any molecular-crystal superconductor; insulating/magnetic at ambient pressure, only superconducts once pressurized", "ref": "Ganin et al., Nat. Mater. 7, 367 (2008); IOPscience iopscience.org/1361-648X/aa5dbd"}, {"name": "H3S", "common_name": "sulfur hydride", "family": "Hydride (high-pressure)", "elements": ["H", "S"], "tc_K": 203, "pressure": "155 GPa", "discovery_year": 2015, "notes": "First hydride superconductor confirmed above 200 K; conventional (BCS/phonon-mediated) mechanism", "ref": "Drozdov et al., Nature 525, 73 (2015)"}, {"name": "LaH10", "common_name": "lanthanum decahydride", "family": "Hydride (high-pressure)", "elements": ["La", "H"], "tc_K": 260, "pressure": "190 GPa", "discovery_year": 2019, "notes": "Highest confirmed Tc of any binary hydride to date", "ref": "Somayazulu et al., Phys. Rev. Lett. 122, 027001 (2019); Drozdov et al., Nature 569, 528 (2019)"}, {"name": "CaH6", "common_name": "calcium hydride (clathrate)", "family": "Hydride (high-pressure)", "elements": ["Ca", "H"], "tc_K": 215, "pressure": "172 GPa", "discovery_year": 2021, "notes": "First non-rare-earth/actinide clathrate superhydride synthesized", "ref": "Ma et al., Phys. Rev. Lett. 128, 167001 (2022), arXiv:2103.16282"}, {"name": "YH9", "common_name": "yttrium hydride (clathrate)", "family": "Hydride (high-pressure)", "elements": ["Y", "H"], "tc_K": 243, "pressure": "201 GPa", "discovery_year": 2021, "notes": "Value approximate; some independent measurements differ slightly", "ref": "PMC11173201 review"}, {"name": "YH6", "common_name": "yttrium hydride (clathrate)", "family": "Hydride (high-pressure)", "elements": ["Y", "H"], "tc_K": 224, "pressure": "166 GPa", "discovery_year": 2021, "notes": "Value approximate", "ref": "PMC11173201 review"}, {"name": "Carbonaceous sulfur hydride (C-S-H)", "common_name": null, "family": "Hydride (high-pressure)", "elements": ["C", "S", "H"], "tc_K": 288, "pressure": "267 GPa", "discovery_year": 2020, "notes": "RETRACTED. Originally published Nature 586, 373 (2020) as first claimed room-temperature superconductor; retracted by Nature in 2022 following concerns over raw data and irreproducibility. Do not treat as an established result.", "ref": "Snider et al., Nature 586, 373 (2020) — RETRACTED, Nature 610, 804 (2022)"}, {"name": "LuH2-xNy ('nitrogen-doped lutetium hydride')", "common_name": "'red matter'", "family": "Hydride (high-pressure)", "elements": ["Lu", "H", "N"], "tc_K": 294, "pressure": "~1 GPa", "discovery_year": 2023, "notes": "RETRACTED. Claimed near-ambient-pressure room-temperature superconductivity; retracted by Nature in Nov 2023 after co-authors and outside researchers raised data reliability concerns; part of a pattern of retractions from the same research group. Do not treat as an established result.", "ref": "Dasenbrock-Gammon et al., Nature 615, 244 (2023) — RETRACTED, Nature (2023)"}, {"name": "LK-99 (Cu-doped Pb-apatite)", "common_name": "LK-99", "family": "Other", "elements": ["Pb", "Cu", "P", "O"], "tc_K": null, "pressure": "ambient", "discovery_year": 2023, "notes": "UNCONFIRMED / not a superconductor. 2023 preprint claimed ambient-pressure, ambient-temperature superconductivity; broad independent replication effort found the observed resistivity drop and partial diamagnetism attributable to a Cu2S impurity phase transition, not superconductivity. Included for completeness; do not treat as a real superconductor.", "ref": "Multiple replication studies, summer 2023 (see e.g. arXiv:2308.01516 and follow-ups)"}, {"name": "2H-NbSe2", "common_name": null, "family": "TMD (dichalcogenide)", "elements": ["Nb", "Se"], "tc_K": 7.2, "pressure": "ambient", "discovery_year": 1965, "notes": "Multiband superconductor coexisting with a charge-density-wave order; classic system for STM vortex-core imaging (Hess et al. 1989) and Higgs-mode studies", "ref": "Revolinsky et al., J. Phys. Chem. Solids 26, 1029 (1965)"}, {"name": "MoS2 (ion-gated)", "common_name": null, "family": "TMD (dichalcogenide)", "elements": ["Mo", "S"], "tc_K": 10, "pressure": "ambient", "discovery_year": 2012, "notes": "Bulk MoS2 is a semiconductor; superconductivity induced by electrostatic (ionic-liquid) gating to high carrier density", "ref": "Ye et al., Science 338, 1193 (2012)"}, {"name": "Sr2RuO4", "common_name": null, "family": "Ruthenate", "elements": ["Sr", "Ru", "O"], "tc_K": 1.5, "pressure": "ambient", "discovery_year": 1994, "notes": "Landmark unconventional superconductor; long considered a chiral p-wave (spin-triplet) candidate, though a 2025 NMR Knight-shift study challenges that interpretation; structurally analogous to La2CuO4-type cuprates but metallic/superconducting without doping", "ref": "Maeno et al., Nature 372, 532 (1994); Physics Today (2025) follow-up"}, {"name": "UTe2", "common_name": null, "family": "Heavy fermion", "elements": ["U", "Te"], "tc_K": 1.6, "pressure": "ambient", "discovery_year": 2018, "notes": "Leading spin-triplet superconductor candidate; multiple superconducting phases under pressure (Tc rises to ~3 K near 1.2 GPa); superconducting properties are notably sample/synthesis-method dependent", "ref": "Ran et al., Science 365, 684 (2019)"}, {"name": "YNi2B2C", "common_name": "borocarbide", "family": "Borocarbide", "elements": ["Y", "Ni", "B", "C"], "tc_K": 15.5, "pressure": "ambient", "discovery_year": 1994, "notes": "First quaternary intermetallic superconductor family discovered; noted for unusual square (rather than triangular) vortex lattice", "ref": "Cava et al., Nature 367, 146 (1994)"}, {"name": "LuNi2B2C", "common_name": "borocarbide", "family": "Borocarbide", "elements": ["Lu", "Ni", "B", "C"], "tc_K": 16.5, "pressure": "ambient", "discovery_year": 1994, "notes": "Highly anisotropic (possibly nodal) gap function despite phonon-mediated pairing", "ref": "Nagarajan et al., Phys. Rev. Lett. 72, 274 (1994)"}, {"name": "YPd2B2C", "common_name": "borocarbide", "family": "Borocarbide", "elements": ["Y", "Pd", "B", "C"], "tc_K": 23, "pressure": "ambient", "discovery_year": 1994, "notes": "Highest Tc of the quaternary borocarbide family", "ref": "Dezaneti et al. (2000), ScienceDirect handbook chapter"}, {"name": "ErNi2B2C", "common_name": "magnetic borocarbide", "family": "Borocarbide", "elements": ["Er", "Ni", "B", "C"], "tc_K": 11, "pressure": "ambient", "discovery_year": 1994, "notes": "Superconductivity (Tc~11K) coexists with antiferromagnetic order (TN~6K) in the same material - a rare and heavily studied coexistence case", "ref": "ScienceDirect handbook chapter (2009)"}, {"name": "PuCoGa5", "common_name": null, "family": "Heavy fermion", "elements": ["Pu", "Co", "Ga"], "tc_K": 18.5, "pressure": "ambient", "discovery_year": 2002, "notes": "Highest Tc of any heavy-fermion superconductor by nearly an order of magnitude; first Pu compound found to superconduct at all; radioactive self-damage from Pu decay creates natural pinning centers", "ref": "Sarrao et al., Nature 420, 297 (2002)"}, {"name": "PuRhGa5", "common_name": null, "family": "Heavy fermion", "elements": ["Pu", "Rh", "Ga"], "tc_K": 8.7, "pressure": "ambient", "discovery_year": 2005, "notes": "", "ref": "Wastin et al. (2003); Bauer & Thompson review, arXiv:1601.06329"}, {"name": "CsV3Sb5", "common_name": "kagome superconductor", "family": "Kagome metal", "elements": ["Cs", "V", "Sb"], "tc_K": 2.5, "pressure": "ambient", "discovery_year": 2021, "notes": "First widely-studied kagome-lattice superconductor; coexists/competes with a charge-density-wave state; Tc enhanced several-fold under pressure", "ref": "Ortiz et al., Phys. Rev. Lett. 125, 247002 (2020)"}, {"name": "KV3Sb5", "common_name": "kagome superconductor", "family": "Kagome metal", "elements": ["K", "V", "Sb"], "tc_K": 0.93, "pressure": "ambient", "discovery_year": 2021, "notes": "", "ref": "arXiv:2102.09328"}, {"name": "Magic-angle twisted bilayer graphene", "common_name": "MATBG", "family": "Moire/2D material", "elements": ["C"], "tc_K": 1.7, "pressure": "ambient", "discovery_year": 2018, "notes": "Pure carbon; two graphene sheets stacked at a ~1.1 degree 'magic angle' produce flat electronic bands; superconductivity is electrostatically tunable, not a fixed-composition material in the usual sense; strength of pairing per Fermi-surface size is unusually high", "ref": "Cao et al., Nature 556, 43 (2018)"}, {"name": "Nd2-xCexCuO4", "common_name": "NCCO", "family": "Cuprate", "elements": ["Nd", "Ce", "Cu", "O"], "tc_K": 25, "pressure": "ambient", "discovery_year": 1989, "notes": "First electron-doped (n-type) cuprate discovered, as opposed to the hole-doped (p-type) cuprates listed elsewhere in this file; exact optimal Tc is sensitive to post-growth annealing/oxygen reduction, not doping level alone", "ref": "Tokura et al., Nature 337, 345 (1989)"}, {"name": "Bi4O4S3", "common_name": null, "family": "BiS2-based", "elements": ["Bi", "O", "S"], "tc_K": 4.5, "pressure": "ambient", "discovery_year": 2012, "notes": "First member of the BiS2-layered superconductor family reported", "ref": "Mizuguchi et al., Phys. Rev. B 86, 220510 (2012)"}, {"name": "SrTiO3 (reduced/doped)", "common_name": null, "family": "Other", "elements": ["Sr", "Ti", "O"], "tc_K": 0.4, "pressure": "ambient", "discovery_year": 1964, "notes": "Superconducts only when oxygen-reduced or lightly electron-doped; famous for having by far the lowest carrier density of any known superconductor, challenging simple BCS phonon-pairing pictures", "ref": "Schooley et al., Phys. Rev. Lett. 12, 474 (1964)"}, {"name": "FeTe0.5Se0.5", "common_name": null, "family": "Iron-based (pnictide/chalcogenide)", "elements": ["Fe", "Te", "Se"], "tc_K": 14, "pressure": "ambient", "discovery_year": 2008, "notes": "Simple binary-chalcogenide (11-family) composition; widely used as a platform for Majorana zero-mode searches at vortex cores", "ref": "Fang et al., Phys. Rev. B 78, 224503 (2008)"}, {"name": "CaKFe4As4", "common_name": "12442-family", "family": "Iron-based (pnictide/chalcogenide)", "elements": ["Ca", "K", "Fe", "As"], "tc_K": 35, "pressure": "ambient", "discovery_year": 2016, "notes": "Stoichiometric (self-doped by design), ordered 12442 structure - no chemical substitution required to reach a high Tc", "ref": "Iyo et al., J. Am. Chem. Soc. 138, 3410 (2016)"}, {"name": "CrAs", "common_name": null, "family": "Other", "elements": ["Cr", "As"], "tc_K": 2.2, "pressure": "~1 GPa", "discovery_year": 2014, "notes": "Pressure-induced unconventional superconductivity emerging as pressure suppresses CrAs's helimagnetic order - first superconductor found in a Cr-based magnetic system; not superconducting at ambient pressure", "ref": "Wu et al., Nat. Commun. 5, 5508 (2014)"}, {"name": "CrH", "common_name": null, "family": "Other", "elements": ["Cr", "H"], "tc_K": 10.6, "pressure": "ambient", "discovery_year": 2015, "notes": "Estimated Tc; superconducts at atmospheric pressure once hydrogenated, unlike pure Cr", "ref": "Scientific Reports, PMC4667211 (2015)"}, {"name": "CrH3", "common_name": null, "family": "Hydride (high-pressure)", "elements": ["Cr", "H"], "tc_K": 37.1, "pressure": "81 GPa", "discovery_year": 2015, "notes": "Enhanced by the metallic hydrogen sublattice; Tc comparable to MgB2", "ref": "Scientific Reports, PMC4667211 (2015)"}, {"name": "Au2Bi", "common_name": null, "family": "Other", "elements": ["Au", "Bi"], "tc_K": 1.8, "pressure": "ambient", "discovery_year": 1932, "notes": "Classic textbook example: neither gold nor bismuth superconducts alone, but the Laves-phase compound does. Known since de Haas & Jurriaanse (1932)", "ref": "de Haas & Jurriaanse, Proc. K. Akad. Wet. Amsterdam 35, 748 (1932); MDPI Nanomaterials 14, 1740 (2024)"}, {"name": "Au2Pb", "common_name": null, "family": "Other", "elements": ["Au", "Pb"], "tc_K": 1.13, "pressure": "ambient", "discovery_year": 2016, "notes": "Topologically nontrivial superconductor (candidate topological superconductor)", "ref": "Xing et al., npj Quantum Mater. 1, 16005 (2016)"}, {"name": "Nb3Au", "common_name": null, "family": "A15", "elements": ["Nb", "Au"], "tc_K": 11.5, "pressure": "ambient", "discovery_year": null, "notes": "", "ref": "arXiv:1812.09308"}, {"name": "PdH", "common_name": "palladium hydride", "family": "Other", "elements": ["Pd", "H"], "tc_K": 8.5, "pressure": "ambient", "discovery_year": 1972, "notes": "Pure Pd does not superconduct; superconducts once hydrogen-loaded, no pressure required. Famous for its INVERSE isotope effect: PdD (~10-11 K) superconducts higher than PdH (~8-9 K), backwards from ordinary BCS behavior", "ref": "Stritzker & Buckel, Z. Physik 257, 1 (1972); JPSJ 89, 051004 (2020) review"}, {"name": "Nd0.8Sr0.2NiO2", "common_name": "infinite-layer nickelate", "family": "Nickelate", "elements": ["Nd", "Sr", "Ni", "O"], "tc_K": 15, "pressure": "ambient", "discovery_year": 2019, "notes": "First nickelate superconductor discovered; structurally analogous to infinite-layer cuprates; thin-film only so far. Tc range reported 9-15 K", "ref": "Li et al., Nature 572, 624 (2019)"}, {"name": "La3Ni2O7", "common_name": "bilayer nickelate", "family": "Nickelate", "elements": ["La", "Ni", "O"], "tc_K": 80, "pressure": "~14-30 GPa", "discovery_year": 2023, "notes": "Bulk single-crystal Ruddlesden-Popper bilayer nickelate; not superconducting at ambient pressure; sparked major follow-up interest as a cuprate-adjacent high-Tc family. Some (La,Pr)3Ni2O7 thin-film variants report onset above 40 K at ambient pressure", "ref": "Sun et al., Nature 621, 493 (2023)"}, {"name": "LaSc2H24 (predicted)", "common_name": null, "family": "Hydride (high-pressure)", "elements": ["La", "Sc", "H"], "tc_K": null, "pressure": "~300 GPa (predicted)", "discovery_year": 2024, "notes": "THEORETICAL PREDICTION ONLY, not yet experimentally synthesized or confirmed as of this compilation. A separate claim of experimental synthesis in this composition space exists in preprint/secondary form but has uncertain provenance and is not included here as fact, given this subfield's retraction history.", "ref": "Song et al., PNAS 121 (2024), 'Predicted hot superconductivity in LaSc2H24 under pressure'"}], "layout": [{"sym": "H", "name": "Hydrogen", "num": 1, "row": 1, "col": 1}, {"sym": "He", "name": "Helium", "num": 2, "row": 1, "col": 18}, {"sym": "Li", "name": "Lithium", "num": 3, "row": 2, "col": 1}, {"sym": "Be", "name": "Beryllium", "num": 4, "row": 2, "col": 2}, {"sym": "B", "name": "Boron", "num": 5, "row": 2, "col": 13}, {"sym": "C", "name": "Carbon", "num": 6, "row": 2, "col": 14}, {"sym": "N", "name": "Nitrogen", "num": 7, "row": 2, "col": 15}, {"sym": "O", "name": "Oxygen", "num": 8, "row": 2, "col": 16}, {"sym": "F", "name": "Fluorine", "num": 9, "row": 2, "col": 17}, {"sym": "Ne", "name": "Neon", "num": 10, "row": 2, "col": 18}, {"sym": "Na", "name": "Sodium", "num": 11, "row": 3, "col": 1}, {"sym": "Mg", "name": "Magnesium", "num": 12, "row": 3, "col": 2}, {"sym": "Al", "name": "Aluminium", "num": 13, "row": 3, "col": 13}, {"sym": "Si", "name": "Silicon", "num": 14, "row": 3, "col": 14}, {"sym": "P", "name": "Phosphorus", "num": 15, "row": 3, "col": 15}, {"sym": "S", "name": "Sulfur", "num": 16, "row": 3, "col": 16}, {"sym": "Cl", "name": "Chlorine", "num": 17, "row": 3, "col": 17}, {"sym": "Ar", "name": "Argon", "num": 18, "row": 3, "col": 18}, {"sym": "K", "name": "Potassium", "num": 19, "row": 4, "col": 1}, {"sym": "Ca", "name": "Calcium", "num": 20, "row": 4, "col": 2}, {"sym": "Sc", "name": "Scandium", "num": 21, "row": 4, "col": 3}, {"sym": "Ti", "name": "Titanium", "num": 22, "row": 4, "col": 4}, {"sym": "V", "name": "Vanadium", "num": 23, "row": 4, "col": 5}, {"sym": "Cr", "name": "Chromium", "num": 24, "row": 4, "col": 6}, {"sym": "Mn", "name": "Manganese", "num": 25, "row": 4, "col": 7}, {"sym": "Fe", "name": "Iron", "num": 26, "row": 4, "col": 8}, {"sym": "Co", "name": "Cobalt", "num": 27, "row": 4, "col": 9}, {"sym": "Ni", "name": "Nickel", "num": 28, "row": 4, "col": 10}, {"sym": "Cu", "name": "Copper", "num": 29, "row": 4, "col": 11}, {"sym": "Zn", "name": "Zinc", "num": 30, "row": 4, "col": 12}, {"sym": "Ga", "name": "Gallium", "num": 31, "row": 4, "col": 13}, {"sym": "Ge", "name": "Germanium", "num": 32, "row": 4, "col": 14}, {"sym": "As", "name": "Arsenic", "num": 33, "row": 4, "col": 15}, {"sym": "Se", "name": "Selenium", "num": 34, "row": 4, "col": 16}, {"sym": "Br", "name": "Bromine", "num": 35, "row": 4, "col": 17}, {"sym": "Kr", "name": "Krypton", "num": 36, "row": 4, "col": 18}, {"sym": "Rb", "name": "Rubidium", "num": 37, "row": 5, "col": 1}, {"sym": "Sr", "name": "Strontium", "num": 38, "row": 5, "col": 2}, {"sym": "Y", "name": "Yttrium", "num": 39, "row": 5, "col": 3}, {"sym": "Zr", "name": "Zirconium", "num": 40, "row": 5, "col": 4}, {"sym": "Nb", "name": "Niobium", "num": 41, "row": 5, "col": 5}, {"sym": "Mo", "name": "Molybdenum", "num": 42, "row": 5, "col": 6}, {"sym": "Tc", "name": "Technetium", "num": 43, "row": 5, "col": 7}, {"sym": "Ru", "name": "Ruthenium", "num": 44, "row": 5, "col": 8}, {"sym": "Rh", "name": "Rhodium", "num": 45, "row": 5, "col": 9}, {"sym": "Pd", "name": "Palladium", "num": 46, "row": 5, "col": 10}, {"sym": "Ag", "name": "Silver", "num": 47, "row": 5, "col": 11}, {"sym": "Cd", "name": "Cadmium", "num": 48, "row": 5, "col": 12}, {"sym": "In", "name": "Indium", "num": 49, "row": 5, "col": 13}, {"sym": "Sn", "name": "Tin", "num": 50, "row": 5, "col": 14}, {"sym": "Sb", "name": "Antimony", "num": 51, "row": 5, "col": 15}, {"sym": "Te", "name": "Tellurium", "num": 52, "row": 5, "col": 16}, {"sym": "I", "name": "Iodine", "num": 53, "row": 5, "col": 17}, {"sym": "Xe", "name": "Xenon", "num": 54, "row": 5, "col": 18}, {"sym": "Cs", "name": "Cesium", "num": 55, "row": 6, "col": 1}, {"sym": "Ba", "name": "Barium", "num": 56, "row": 6, "col": 2}, {"sym": "Hf", "name": "Hafnium", "num": 72, "row": 6, "col": 4}, {"sym": "Ta", "name": "Tantalum", "num": 73, "row": 6, "col": 5}, {"sym": "W", "name": "Tungsten", "num": 74, "row": 6, "col": 6}, {"sym": "Re", "name": "Rhenium", "num": 75, "row": 6, "col": 7}, {"sym": "Os", "name": "Osmium", "num": 76, "row": 6, "col": 8}, {"sym": "Ir", "name": "Iridium", "num": 77, "row": 6, "col": 9}, {"sym": "Pt", "name": "Platinum", "num": 78, "row": 6, "col": 10}, {"sym": "Au", "name": "Gold", "num": 79, "row": 6, "col": 11}, {"sym": "Hg", "name": "Mercury", "num": 80, "row": 6, "col": 12}, {"sym": "Tl", "name": "Thallium", "num": 81, "row": 6, "col": 13}, {"sym": "Pb", "name": "Lead", "num": 82, "row": 6, "col": 14}, {"sym": "Bi", "name": "Bismuth", "num": 83, "row": 6, "col": 15}, {"sym": "Po", "name": "Polonium", "num": 84, "row": 6, "col": 16}, {"sym": "At", "name": "Astatine", "num": 85, "row": 6, "col": 17}, {"sym": "Rn", "name": "Radon", "num": 86, "row": 6, "col": 18}, {"sym": "Fr", "name": "Francium", "num": 87, "row": 7, "col": 1}, {"sym": "Ra", "name": "Radium", "num": 88, "row": 7, "col": 2}, {"sym": "Rf", "name": "Rutherfordium", "num": 104, "row": 7, "col": 4}, {"sym": "Db", "name": "Dubnium", "num": 105, "row": 7, "col": 5}, {"sym": "Sg", "name": "Seaborgium", "num": 106, "row": 7, "col": 6}, {"sym": "Bh", "name": "Bohrium", "num": 107, "row": 7, "col": 7}, {"sym": "Hs", "name": "Hassium", "num": 108, "row": 7, "col": 8}, {"sym": "Mt", "name": "Meitnerium", "num": 109, "row": 7, "col": 9}, {"sym": "Ds", "name": "Darmstadtium", "num": 110, "row": 7, "col": 10}, {"sym": "Rg", "name": "Roentgenium", "num": 111, "row": 7, "col": 11}, {"sym": "Cn", "name": "Copernicium", "num": 112, "row": 7, "col": 12}, {"sym": "Nh", "name": "Nihonium", "num": 113, "row": 7, "col": 13}, {"sym": "Fl", "name": "Flerovium", "num": 114, "row": 7, "col": 14}, {"sym": "Mc", "name": "Moscovium", "num": 115, "row": 7, "col": 15}, {"sym": "Lv", "name": "Livermorium", "num": 116, "row": 7, "col": 16}, {"sym": "Ts", "name": "Tennessine", "num": 117, "row": 7, "col": 17}, {"sym": "Og", "name": "Oganesson", "num": 118, "row": 7, "col": 18}, {"sym": "La", "name": "Lanthanum", "num": 57, "row": 9, "col": 3}, {"sym": "Ce", "name": "Cerium", "num": 58, "row": 9, "col": 4}, {"sym": "Pr", "name": "Praseodymium", "num": 59, "row": 9, "col": 5}, {"sym": "Nd", "name": "Neodymium", "num": 60, "row": 9, "col": 6}, {"sym": "Pm", "name": "Promethium", "num": 61, "row": 9, "col": 7}, {"sym": "Sm", "name": "Samarium", "num": 62, "row": 9, "col": 8}, {"sym": "Eu", "name": "Europium", "num": 63, "row": 9, "col": 9}, {"sym": "Gd", "name": "Gadolinium", "num": 64, "row": 9, "col": 10}, {"sym": "Tb", "name": "Terbium", "num": 65, "row": 9, "col": 11}, {"sym": "Dy", "name": "Dysprosium", "num": 66, "row": 9, "col": 12}, {"sym": "Ho", "name": "Holmium", "num": 67, "row": 9, "col": 13}, {"sym": "Er", "name": "Erbium", "num": 68, "row": 9, "col": 14}, {"sym": "Tm", "name": "Thulium", "num": 69, "row": 9, "col": 15}, {"sym": "Yb", "name": "Ytterbium", "num": 70, "row": 9, "col": 16}, {"sym": "Lu", "name": "Lutetium", "num": 71, "row": 9, "col": 17}, {"sym": "Ac", "name": "Actinium", "num": 89, "row": 10, "col": 3}, {"sym": "Th", "name": "Thorium", "num": 90, "row": 10, "col": 4}, {"sym": "Pa", "name": "Protactinium", "num": 91, "row": 10, "col": 5}, {"sym": "U", "name": "Uranium", "num": 92, "row": 10, "col": 6}, {"sym": "Np", "name": "Neptunium", "num": 93, "row": 10, "col": 7}, {"sym": "Pu", "name": "Plutonium", "num": 94, "row": 10, "col": 8}, {"sym": "Am", "name": "Americium", "num": 95, "row": 10, "col": 9}, {"sym": "Cm", "name": "Curium", "num": 96, "row": 10, "col": 10}, {"sym": "Bk", "name": "Berkelium", "num": 97, "row": 10, "col": 11}, {"sym": "Cf", "name": "Californium", "num": 98, "row": 10, "col": 12}, {"sym": "Es", "name": "Einsteinium", "num": 99, "row": 10, "col": 13}, {"sym": "Fm", "name": "Fermium", "num": 100, "row": 10, "col": 14}, {"sym": "Md", "name": "Mendelevium", "num": 101, "row": 10, "col": 15}, {"sym": "No", "name": "Nobelium", "num": 102, "row": 10, "col": 16}, {"sym": "Lr", "name": "Lawrencium", "num": 103, "row": 10, "col": 17}]};
+
+const els = DATA.elements;       // symbol -> elemental SC info
+const compounds = DATA.compounds; // list
+const layout = DATA.layout;       // grid positions
+
+function compoundsFor(sym) {
+  return compounds.filter(c => c.elements.includes(sym));
+}
+function partnersFor(sym) {
+  const set = new Set();
+  compoundsFor(sym).forEach(c => c.elements.forEach(e => { if (e !== sym) set.add(e); }));
+  return set;
+}
+function membershipState(sym) {
+  const info = els[sym];
+  const nCompounds = compoundsFor(sym).length;
+  if (info) return info.elemental_sc ? "ambient" : "highp";
+  if (nCompounds > 0) return "compound";
+  return "none";
+}
+
+let selected = null;
+
+function statusBadge(notes) {
+  if (!notes) return "";
+  const n = notes.toUpperCase();
+  if (n.includes("RETRACTED")) return '<span class="badge critical">&#10007; RETRACTED</span>';
+  if (n.includes("UNCONFIRMED")) return '<span class="badge warning">&#9888; UNCONFIRMED</span>';
+  if (n.includes("THEORETICAL PREDICTION")) return '<span class="badge serious">&#9671; PREDICTED, NOT CONFIRMED</span>';
+  return "";
+}
+
+function renderTable() {
+  const table = document.getElementById("ptable");
+  table.innerHTML = "";
+  const partners = selected ? partnersFor(selected) : null;
+
+  layout.forEach(({sym, name, num, row, col}) => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.style.setProperty("--r", row);
+    cell.style.setProperty("--c", col);
+
+    const state = membershipState(sym);
+    const interactive = state !== "none";
+    if (interactive) cell.classList.add("clickable");
+
+    if (!selected) {
+      cell.classList.add("state-" + state);
+    } else {
+      if (sym === selected) cell.classList.add("sel-selected");
+      else if (partners.has(sym)) cell.classList.add("sel-related");
+      else cell.classList.add("sel-faded");
+    }
+
+    cell.innerHTML = `<span class="num">${num}</span><span class="sym">${sym}</span>`;
+
+    if (interactive) {
+      cell.addEventListener("click", () => {
+        selected = (selected === sym) ? null : sym;
+        renderTable();
+        renderPanel();
+      });
+      cell.addEventListener("mouseenter", (e) => showTooltip(e, sym, name, state));
+      cell.addEventListener("mousemove", moveTooltip);
+      cell.addEventListener("mouseleave", hideTooltip);
+    }
+
+    table.appendChild(cell);
+  });
+}
+
+function showTooltip(e, sym, name, state) {
+  const tip = document.getElementById("tooltip");
+  let line = name + " (" + sym + ")";
+  if (state === "ambient") line += " \u2014 ambient-pressure elemental superconductor";
+  else if (state === "highp") line += " \u2014 elemental superconductor under pressure only";
+  else if (state === "compound") line += " \u2014 appears in " + compoundsFor(sym).length + " compound(s) here";
+  tip.textContent = line;
+  tip.style.display = "block";
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  const tip = document.getElementById("tooltip");
+  tip.style.left = (e.clientX + 14) + "px";
+  tip.style.top = (e.clientY + 14) + "px";
+}
+function hideTooltip() {
+  document.getElementById("tooltip").style.display = "none";
+}
+
+function elementName(sym) {
+  const l = layout.find(l => l.sym === sym);
+  return l ? l.name : sym;
+}
+
+function chipRow(symbols) {
+  return '<div class="chip-row">' + symbols.map(s =>
+    `<span class="chip" data-sym="${s}">${s} \u2014 ${elementName(s)}</span>`
+  ).join("") + "</div>";
+}
+
+function renderPanel() {
+  const panel = document.getElementById("panel");
+  if (!selected) {
+    panel.innerHTML = `<p class="empty">Select an element in the table to see its superconducting data and which elements it has been combined with.</p>` + renderLegendNote();
+    return;
+  }
+
+  const sym = selected;
+  const name = elementName(sym);
+  const info = els[sym];
+  const comps = compoundsFor(sym);
+  const partners = Array.from(partnersFor(sym)).sort();
+
+  let html = `<h2>${name}</h2><p class="el-name">${sym}</p>`;
+  html += `<button class="clear-btn" id="clear-btn">Clear selection</button>`;
+
+  if (info) {
+    if (info.elemental_sc) {
+      html += `<div class="section-title">Elemental superconductor (ambient pressure)</div>`;
+      html += `<p>T<sub>c</sub> = ${info.tc_ambient_K} K`;
+      if (info.tc_highP_K) html += `, rising to ${info.tc_highP_K} K at ${info.pressure_GPa} GPa`;
+      html += `</p>`;
+    } else {
+      html += `<div class="section-title">Elemental superconductor (high pressure only)</div>`;
+      html += `<p>T<sub>c</sub> = ${info.tc_highP_K} K at ${info.pressure_GPa} GPa (does not superconduct at ambient pressure)</p>`;
+    }
+    if (info.notes) html += `<p class="compound notes" style="border:none;padding:0;">${info.notes}</p>`;
+    html += `<p class="ref">${info.ref}</p>`;
+  }
+
+  if (comps.length > 0) {
+    html += `<div class="section-title">Compounds containing ${sym} (${comps.length})</div>`;
+    comps.forEach(c => {
+      const others = c.elements.filter(e => e !== sym);
+      html += `<div class="compound">
+        <div class="name">${c.name}${c.common_name ? " (" + c.common_name + ")" : ""}</div>
+        <div class="meta">${c.family} &middot; ${c.tc_K !== null ? "T<sub>c</sub> = " + c.tc_K + " K" : "T<sub>c</sub> not established"} &middot; ${c.pressure} &middot; ${c.discovery_year}</div>
+        ${statusBadge(c.notes)}
+        ${c.notes ? `<div class="notes">${c.notes}</div>` : ""}
+        <div class="ref">${c.ref}</div>
+        ${chipRow(others)}
+      </div>`;
+    });
+  }
+
+  if (partners.length > 0) {
+    html += `<div class="section-title">All elements combined with ${sym} (${partners.length})</div>`;
+    html += chipRow(partners);
+  }
+
+  if (!info && comps.length === 0) {
+    html += `<p class="empty">No superconductivity data for ${name} in this dataset.</p>`;
+  }
+
+  panel.innerHTML = html;
+
+  document.getElementById("clear-btn").addEventListener("click", () => {
+    selected = null; renderTable(); renderPanel();
+  });
+  panel.querySelectorAll(".chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      selected = chip.dataset.sym; renderTable(); renderPanel();
+      panel.scrollIntoView({behavior: "smooth", block: "nearest"});
+    });
+  });
+}
+
+function renderLegendNote() {
+  return "";
+}
+
+function renderLegend() {
+  const legend = document.getElementById("legend");
+  const items = [
+    ["--aqua-bg", "Elemental superconductor (ambient pressure)"],
+    ["--yellow-bg", "Elemental superconductor (high pressure only)"],
+    ["--compound-bg", "Appears only in compounds below"],
+    [null, "Selection: selected = blue, combined-with = orange outline, unrelated = faded"],
+  ];
+  legend.innerHTML = items.map(([varName, label]) => {
+    const swatch = varName ? `<span class="swatch" style="background:var(${varName})"></span>` : `<span class="swatch" style="background:var(--blue)"></span>`;
+    return `<span class="item">${swatch}${label}</span>`;
+  }).join("");
+}
+
+document.getElementById("about-scope").textContent = DATA.meta.scope_note;
+document.getElementById("about-disputed").textContent = DATA.meta.disputed_claims_policy;
+document.getElementById("about-compiled").textContent = DATA.meta.compiled;
+
+renderTable();
+renderPanel();
+renderLegend();
+</script>
+</body>
+</html>

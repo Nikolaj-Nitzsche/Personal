@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whisky Price Scout Report — 07 September 2026, 10:28</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --amber:#C07B2A;--amber-lt:#E8A94D;
+  --peat:#1C1410;--slate:#2E2620;--oak:#3D2F1F;
+  --grain:#F5EFE6;--mist:#EDE5D8;--smoke:#7A6A58;
+  --green:#2D6A4F;--green-bg:#D8F3DC;
+  --red:#7B2D2D;--red-bg:#F3D8D8;
+  --border:rgba(192,123,42,.25);
+}
+body{font-family:'Inter',sans-serif;background:var(--peat);color:var(--grain);min-height:100vh}
+
+/* HEADER */
+header{
+  background:linear-gradient(160deg,var(--oak) 0%,var(--slate) 55%,var(--peat) 100%);
+  border-bottom:2px solid var(--amber);
+  padding:2.5rem 2rem 2rem;text-align:center;
+  position:relative;overflow:hidden;
+}
+header::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 60% 90% at 50% 0%,rgba(192,123,42,.15) 0%,transparent 70%);
+  pointer-events:none}
+.flag-row{display:flex;align-items:center;justify-content:center;gap:1rem;
+  margin-bottom:.75rem;font-size:2rem}
+.vs-pill{font-size:.7rem;font-weight:600;letter-spacing:.12em;color:var(--amber);
+  background:rgba(192,123,42,.15);border:1px solid var(--amber);border-radius:99px;padding:.25rem .75rem}
+h1{font-family:'Playfair Display',serif;font-size:clamp(1.8rem,4vw,2.8rem);
+  font-weight:700;line-height:1.1;margin-bottom:.4rem}
+.subtitle{color:var(--smoke);font-size:.85rem;font-weight:300}
+.meta{margin-top:.75rem;font-size:.72rem;color:var(--smoke)}
+.rate-warn{color:#E07070}
+
+/* SUMMARY */
+.summary{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;
+  max-width:1100px;margin:2rem auto;padding:0 1.25rem;
+}
+.stat{background:var(--slate);border:1px solid var(--border);border-radius:10px;
+  padding:1.1rem 1rem;text-align:center}
+.stat .num{font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:700;line-height:1}
+.stat .lbl{font-size:.7rem;color:var(--smoke);margin-top:.2rem}
+.stat.g .num{color:#52B788}.stat.r .num{color:#E07070}
+.stat.a .num{color:var(--amber-lt);font-size:1.3rem}
+
+/* CONTROLS */
+.controls{max-width:1100px;margin:0 auto 1.25rem;padding:0 1.25rem;
+  display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.tab{background:transparent;border:1px solid var(--border);border-radius:99px;
+  color:var(--smoke);font-family:'Inter',sans-serif;font-size:.78rem;font-weight:500;
+  padding:.3rem .9rem;cursor:pointer;transition:all .2s}
+.tab:hover{border-color:var(--amber);color:var(--grain)}
+.tab.active{background:var(--amber);border-color:var(--amber);color:var(--peat)}
+.search-box{margin-left:auto;background:var(--slate);border:1px solid var(--border);
+  border-radius:7px;color:var(--grain);font-family:'Inter',sans-serif;font-size:.8rem;
+  padding:.35rem .8rem;outline:none;width:220px}
+.search-box:focus{border-color:var(--amber)}
+.search-box::placeholder{color:var(--smoke)}
+
+/* CARDS */
+.results{max-width:1100px;margin:0 auto;padding:0 1.25rem 4rem}
+.card{background:var(--slate);border:1px solid var(--border);border-radius:10px;
+  padding:1rem 1.25rem;margin-bottom:.7rem;transition:border-color .2s}
+.card:hover{border-color:rgba(192,123,42,.5)}
+.card.cheaper{border-left:3px solid #52B788}
+.card.dearer{border-left:3px solid #E07070}
+.card[style*="none"]{display:none}
+
+.card-name{font-family:'Playfair Display',serif;font-size:.95rem;margin-bottom:.2rem}
+.card-name a{color:var(--grain);text-decoration:none}
+.card-name a:hover{color:var(--amber-lt);text-decoration:underline}
+.card-match{font-size:.72rem;color:var(--smoke);margin-bottom:.7rem}
+.card-match a{color:var(--smoke)}
+.card-match a:hover{color:var(--amber-lt)}
+
+.card-prices{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.price-block{min-width:100px}
+.site-label{font-size:.65rem;color:var(--smoke);margin-bottom:.15rem}
+.price-gbp{font-size:.95rem;font-weight:600;font-variant-numeric:tabular-nums}
+.price-eur{font-size:.72rem;color:var(--smoke)}
+.price-eur.main{font-size:.95rem;font-weight:600;color:var(--grain)}
+.price-arrow{font-size:1.4rem;color:var(--smoke)}
+.badge{border-radius:99px;font-size:.7rem;font-weight:600;padding:.25rem .75rem;margin-left:auto}
+.badge.cheaper{background:var(--green-bg);color:var(--green)}
+.badge.dearer{background:var(--red-bg);color:var(--red)}
+
+.conf{font-size:.7rem;margin-right:.3rem}
+.conf.high{color:#52B788}.conf.medium{color:var(--amber)}
+
+/* SECTION HEADER */
+.section-hdr{max-width:1100px;margin:0 auto 1rem;padding:0 1.25rem;
+  font-family:'Playfair Display',serif;font-size:1.2rem;display:flex;align-items:center;gap:.75rem}
+.section-hdr span{font-family:'Inter',sans-serif;font-size:.75rem;color:var(--smoke);font-weight:400}
+.divider{max-width:1100px;margin:2rem auto;padding:0 1.25rem;border:none;
+  border-top:1px solid var(--border)}
+
+/* EMPTY */
+.empty{color:var(--smoke);text-align:center;padding:2rem;font-size:.875rem}
+
+footer{text-align:center;color:var(--smoke);font-size:.7rem;padding:1.5rem;
+  border-top:1px solid var(--border)}
+
+@media(max-width:700px){
+  .summary{grid-template-columns:1fr 1fr}
+  .card-prices{gap:.6rem}
+  .search-box{width:100%;margin-left:0}
+  .controls{flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="flag-row"><span>🏴󠁧󠁢󠁳󠁣󠁴󠁿</span><span class="vs-pill">SCOUT</span><span>🇳🇱</span></div>
+  <h1>Whisky Price Scout</h1>
+  <p class="subtitle">Sainsbury's (GBP→EUR) compared to Drankdozijn (EUR)</p>
+  <p class="meta">Generated 07 September 2026, 10:28 · 5 Sainsbury's bottles · 5 Drankdozijn bottles · 1&nbsp;GBP&nbsp;=&nbsp;1.1750&nbsp;EUR</p>
+</header>
+
+<div class="summary">
+  <div class="stat g"><div class="num">5</div><div class="lbl">Cheaper at Sainsbury's</div></div>
+  <div class="stat r"><div class="num">0</div><div class="lbl">Cheaper at Drankdozijn</div></div>
+  <div class="stat g"><div class="num">€26.17</div><div class="lbl">Total potential saving</div></div>
+  <div class="stat g"><div class="num">€7.60</div><div class="lbl">Biggest single saving</div></div>
+  <div class="stat a"><div class="num">1.1750</div><div class="lbl">GBP → EUR</div></div>
+</div>
+
+<div class="controls">
+  <button class="tab active" onclick="filter('all',this)">All (5)</button>
+  <button class="tab" onclick="filter('cheaper',this)">✅ Cheaper at Sainsbury's (5)</button>
+  <button class="tab" onclick="filter('dearer',this)">❌ Pricier at Sainsbury's (0)</button>
+  <input class="search-box" type="text" placeholder="🔍 Search bottles…" oninput="search(this.value)" />
+</div>
+
+<div class="results" id="cards">
+  <div class="section-hdr">🟢 Cheaper at Sainsbury's <span>sorted by saving, highest first</span></div>
+  
+        <div class="card cheaper" data-type="cheaper" data-saving="7.60">
+          <div class="card-name">
+            <span class="conf high" title="High confidence match">●</span>
+            <a href="https://sainsburys.co.uk/macallan" target="_blank" rel="noopener">The Macallan Double Cask 12 Year Old 70cl</a>
+          </div>
+          <div class="card-match">
+            Matched: <a href="https://drankdozijn.nl/macallan" target="_blank" rel="noopener">Macallan Double Cask 12 Years 70cl</a>
+          </div>
+          <div class="card-prices">
+            <div class="price-block sains">
+              <div class="site-label">Sainsbury's</div>
+              <div class="price-gbp">£42.00</div>
+              <div class="price-eur">≈ €49.35</div>
+            </div>
+            <div class="price-arrow">↓</div>
+            <div class="price-block drank">
+              <div class="site-label">Drankdozijn</div>
+              <div class="price-eur main">€56.95</div>
+            </div>
+            <span class="badge cheaper">Save €7.60</span>
+          </div>
+        </div>
+        <div class="card cheaper" data-type="cheaper" data-saving="6.70">
+          <div class="card-name">
+            <span class="conf high" title="High confidence match">●</span>
+            <a href="https://sainsburys.co.uk/laphroaig" target="_blank" rel="noopener">Laphroaig 10 Year Old 70cl</a>
+          </div>
+          <div class="card-match">
+            Matched: <a href="https://drankdozijn.nl/laphroaig" target="_blank" rel="noopener">Laphroaig 10 Years 70cl</a>
+          </div>
+          <div class="card-prices">
+            <div class="price-block sains">
+              <div class="site-label">Sainsbury's</div>
+              <div class="price-gbp">£30.00</div>
+              <div class="price-eur">≈ €35.25</div>
+            </div>
+            <div class="price-arrow">↓</div>
+            <div class="price-block drank">
+              <div class="site-label">Drankdozijn</div>
+              <div class="price-eur main">€41.95</div>
+            </div>
+            <span class="badge cheaper">Save €6.70</span>
+          </div>
+        </div>
+        <div class="card cheaper" data-type="cheaper" data-saving="5.18">
+          <div class="card-name">
+            <span class="conf high" title="High confidence match">●</span>
+            <a href="https://sainsburys.co.uk/talisker" target="_blank" rel="noopener">Talisker 10 Year Old 70cl</a>
+          </div>
+          <div class="card-match">
+            Matched: <a href="https://drankdozijn.nl/talisker" target="_blank" rel="noopener">Talisker 10 Years 70cl</a>
+          </div>
+          <div class="card-prices">
+            <div class="price-block sains">
+              <div class="site-label">Sainsbury's</div>
+              <div class="price-gbp">£33.00</div>
+              <div class="price-eur">≈ €38.77</div>
+            </div>
+            <div class="price-arrow">↓</div>
+            <div class="price-block drank">
+              <div class="site-label">Drankdozijn</div>
+              <div class="price-eur main">€43.95</div>
+            </div>
+            <span class="badge cheaper">Save €5.18</span>
+          </div>
+        </div>
+        <div class="card cheaper" data-type="cheaper" data-saving="5.05">
+          <div class="card-name">
+            <span class="conf high" title="High confidence match">●</span>
+            <a href="https://sainsburys.co.uk/glenfiddich" target="_blank" rel="noopener">Glenfiddich 12 Year Old Scotch Whisky 70cl</a>
+          </div>
+          <div class="card-match">
+            Matched: <a href="https://drankdozijn.nl/glenfiddich" target="_blank" rel="noopener">Glenfiddich 12 Years 70cl</a>
+          </div>
+          <div class="card-prices">
+            <div class="price-block sains">
+              <div class="site-label">Sainsbury's</div>
+              <div class="price-gbp">£28.00</div>
+              <div class="price-eur">≈ €32.90</div>
+            </div>
+            <div class="price-arrow">↓</div>
+            <div class="price-block drank">
+              <div class="site-label">Drankdozijn</div>
+              <div class="price-eur main">€37.95</div>
+            </div>
+            <span class="badge cheaper">Save €5.05</span>
+          </div>
+        </div>
+        <div class="card cheaper" data-type="cheaper" data-saving="1.64">
+          <div class="card-name">
+            <span class="conf high" title="High confidence match">●</span>
+            <a href="https://sainsburys.co.uk/jameson" target="_blank" rel="noopener">Jameson Irish Whiskey 70cl</a>
+          </div>
+          <div class="card-match">
+            Matched: <a href="https://drankdozijn.nl/jameson" target="_blank" rel="noopener">Jameson Irish Whiskey 70cl</a>
+          </div>
+          <div class="card-prices">
+            <div class="price-block sains">
+              <div class="site-label">Sainsbury's</div>
+              <div class="price-gbp">£22.00</div>
+              <div class="price-eur">≈ €25.85</div>
+            </div>
+            <div class="price-arrow">↓</div>
+            <div class="price-block drank">
+              <div class="site-label">Drankdozijn</div>
+              <div class="price-eur main">€27.49</div>
+            </div>
+            <span class="badge cheaper">Save €1.64</span>
+          </div>
+        </div>
+  
+  
+</div>
+
+<footer>
+  Whisky Price Scout · Prices scraped 07 September 2026, 10:28 · Purely informational — verify before purchasing<br>
+  <a href="https://www.sainsburys.co.uk/shop/gb/groceries/drinks/whisky" target="_blank" style="color:var(--smoke)">Sainsbury's Whisky</a>
+  &nbsp;·&nbsp;
+  <a href="https://www.drankdozijn.nl/whisky" target="_blank" style="color:var(--smoke)">Drankdozijn Whisky</a>
+</footer>
+
+<script>
+function filter(type, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.card').forEach(c => {
+    if (type === 'all') c.style.display = '';
+    else c.style.display = c.dataset.type === type ? '' : 'none';
+  });
+  currentFilter = type;
+}
+let currentFilter = 'all';
+function search(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.card').forEach(c => {
+    const text = c.textContent.toLowerCase();
+    const typeOk = currentFilter === 'all' || c.dataset.type === currentFilter;
+    c.style.display = (typeOk && (!q || text.includes(q))) ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>

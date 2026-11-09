@@ -1,0 +1,4 @@
+{
+  "last_fetch": "2026-07-29T10:47:14.928155",
+  "query": "General NV centers:any:NV-centers nitrogen-vacancy | Quantum cryo NV centers:all:quantum cryo NV centers | NV mK:all:NV-centers mK | Dilution refrigerators NV centers:all:dilution refrigerator NV centers | Antenna:all:antenna NV centers"
+}

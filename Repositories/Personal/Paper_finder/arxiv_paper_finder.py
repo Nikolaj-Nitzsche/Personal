@@ -16,10 +16,12 @@ from urllib.parse import quote_plus
 from urllib.request import urlopen
 import xml.etree.ElementTree as ET
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+print(SCRIPT_DIR)
 BASE_URL = "http://export.arxiv.org/api/query"
-SEEN_STORE = Path(".arxiv_seen.json")
-CONFIG_STORE = Path(".arxiv_config.json")
-STATE_STORE = Path(".arxiv_state.json")
+SEEN_STORE = SCRIPT_DIR / ".arxiv_seen.json"
+CONFIG_STORE = SCRIPT_DIR / ".arxiv_config.json"
+STATE_STORE = SCRIPT_DIR / ".arxiv_state.json"
 DEFAULT_CONFIG = {
     "keywords": ["quantum", "cryo", "NV-centers"],
     "mode": "majority",
@@ -140,6 +142,13 @@ def create_ssl_context() -> ssl.SSLContext:
     except ImportError:
         context = ssl.create_default_context()
     return context
+
+
+def resolve_path(path_value: str | Path, base_dir: Path = SCRIPT_DIR) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return base_dir / path
 
 
 def send_notification(title: str, message: str) -> None:
@@ -364,22 +373,22 @@ def render_html(section_results: list[dict[str, object]], refresh_interval: int,
           }});
         }}
 
-        function hideReadBadges() {{
+        function updateBadgeVisibility() {{
           var readIds = getReadIds();
-          if (!readIds.size) return;
           document.querySelectorAll('article[data-entry-id]').forEach(function(article) {{
             var entryId = article.dataset.entryId;
-            if (readIds.has(entryId)) {{
-              var badge = article.querySelector('.badge');
-              if (badge) {{
-                badge.style.display = 'none';
-              }}
+            var badge = article.querySelector('.badge');
+            if (!badge) return;
+            if (entryId && readIds.has(entryId)) {{
+              badge.style.display = 'none';
+            }} else {{
+              badge.style.display = '';
             }}
           }});
           updateSectionBadges();
         }}
 
-        hideReadBadges();
+        updateBadgeVisibility();
 
         document.querySelectorAll('article[data-entry-id] h2 a[target="_blank"]').forEach(function(link) {{
           link.addEventListener('click', function() {{
@@ -439,7 +448,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_arguments()
-    config_path = Path(args.config)
+    config_path = resolve_path(args.config)
     config = load_config(config_path)
 
     cli_keywords = [keyword.strip() for keyword in (args.keywords or []) if keyword.strip()]
@@ -463,6 +472,7 @@ def main() -> None:
 
     output_name = args.output if args.output else str(config.get("output", DEFAULT_CONFIG["output"]))
     refresh_interval = args.refresh_interval if args.refresh_interval is not None else int(config.get("refresh_interval_hours", DEFAULT_CONFIG["refresh_interval_hours"]))
+    output_path = resolve_path(output_name)
 
     config_to_save = {
         "refresh_interval_hours": refresh_interval,
@@ -480,7 +490,6 @@ def main() -> None:
     # Always use the cache if the output file exists and --force-refresh is NOT used.
     # This disables automatic refreshing and prevents new API calls unless explicitly requested.
     cache_note = ""
-    output_path = Path(output_name)
     if not args.force_refresh and output_path.exists():
         print("Using cached report; no new arXiv search is performed.")
         cache_note = "Data is cached. Run with --force-refresh to fetch new results."
@@ -491,6 +500,9 @@ def main() -> None:
 
     print(f"Searching arXiv for {len(sections)} section(s)...")
     seen_ids = load_seen_ids(SEEN_STORE)
+    current_query = " | ".join(
+        f"{section['label']}:{section['mode']}:{' '.join(section['keywords'])}" for section in sections
+    )
     section_results: list[dict[str, object]] = []
     total_new = 0
     total_entries = 0
@@ -545,7 +557,7 @@ def main() -> None:
         })
 
     print(f"Found {total_entries} papers ({total_new} new) across {len(section_results)} sections.")
-    output_path = Path(output_name).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     write_output(render_html(section_results, refresh_interval, str(config_path), cache_note), output_path)
     save_seen_ids(SEEN_STORE, seen_ids)
     save_state(STATE_STORE, {"last_fetch": datetime.now().isoformat(), "query": current_query})
